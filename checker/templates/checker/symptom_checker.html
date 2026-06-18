@@ -1,0 +1,289 @@
+{% extends 'checker/base.html' %}
+{% load checker_tags %}
+{% block title %}Symptom Checker — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .page-hero{background:linear-gradient(135deg,#2563eb,#1e3a8a);color:#fff;padding:30px 24px 24px}
+  .page-hero h1{font-size:1.8rem;font-weight:800}
+  .page-hero p{opacity:.83;margin-top:5px;font-size:.9rem}
+
+  .checker-wrap{max-width:1260px;margin:0 auto;padding:24px 24px 60px;
+                display:grid;grid-template-columns:300px 1fr;gap:22px;align-items:start}
+  .sidebar{position:sticky;top:76px}
+
+  .cnt{background:var(--primary);color:#fff;border-radius:999px;padding:1px 9px;
+       font-size:.72rem;font-weight:700;margin-left:6px}
+  .pills-box{min-height:30px;display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+  .pill{background:var(--primary);color:#fff;border-radius:999px;padding:3px 9px;
+        font-size:.75rem;font-weight:500;display:inline-flex;align-items:center;gap:4px}
+  .pill-x{cursor:pointer;opacity:.75;font-size:.88rem}
+  .pill-x:hover{opacity:1}
+  .empty-note{color:var(--muted);font-size:.8rem;font-style:italic}
+
+  .analyse-btn{width:100%;margin-top:14px;padding:13px;font-size:.95rem;border-radius:12px;
+               background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;
+               font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .25s}
+  .analyse-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 22px rgba(37,99,235,.35)}
+  .analyse-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .clear-btn{width:100%;margin-top:7px;padding:9px;font-size:.85rem;border-radius:10px;
+             background:transparent;color:var(--muted);border:2px solid var(--border);
+             cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;transition:all .2s}
+  .clear-btn:hover{border-color:var(--primary);color:var(--primary)}
+
+  /* Patient info bar */
+  .pat-bar{background:var(--primary-l);border:1px solid #bfdbfe;border-radius:10px;
+           padding:10px 13px;margin-bottom:12px;font-size:.8rem}
+  .pat-bar strong{color:var(--primary)}
+
+  .search-input{width:100%;padding:9px 13px 9px 36px;border:2px solid var(--border);
+                border-radius:var(--radius-sm);font-size:.88rem;font-family:'Plus Jakarta Sans',sans-serif;
+                color:var(--text);transition:border-color .2s;background:white}
+  .search-input:focus{outline:none;border-color:var(--primary)}
+  .search-wrap{position:relative;margin-bottom:14px}
+  .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none}
+
+  .sym-area{background:#fff;border-radius:var(--radius);border:1px solid var(--border);padding:18px 20px}
+  .group{margin-bottom:16px}
+  .group-hdr{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+             color:var(--muted);padding:5px 0;border-bottom:1px solid var(--border);margin-bottom:8px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{display:inline-block;padding:5px 12px;border-radius:999px;border:2px solid var(--border);
+        background:#fff;font-size:.78rem;cursor:pointer;transition:all .15s;
+        user-select:none;color:var(--text);font-weight:500;font-family:'Plus Jakarta Sans',sans-serif}
+  .chip:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-l)}
+  .chip.active{border-color:var(--primary);background:var(--primary);color:#fff}
+  .chip.hidden{display:none!important}
+
+  .result-box{margin-top:18px;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;display:none}
+  .result-box.show{display:block;animation:fadeUp .35s ease}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .res-head{background:linear-gradient(135deg,#2563eb,#1e3a8a);color:#fff;padding:24px 28px}
+  .res-head h2{font-size:1.6rem;font-weight:800}
+  .res-head .sub{opacity:.78;font-size:.86rem;margin-top:3px}
+  .conf-bar{height:8px;background:rgba(255,255,255,.2);border-radius:999px;overflow:hidden;margin-top:12px}
+  .conf-fill{height:100%;background:#fff;border-radius:999px;transition:width .8s;width:0%}
+  .res-body{background:#fff;padding:20px 28px}
+  .prec-list{list-style:none;margin:0;padding:0}
+  .prec-list li{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--bg);font-size:.87rem}
+  .prec-list li:last-child{border-bottom:none}
+
+  .loading{text-align:center;padding:28px;color:var(--muted);display:none;margin-top:14px}
+  .disc{font-size:.74rem;color:var(--muted);font-style:italic;margin-top:12px;line-height:1.55}
+
+  @media(max-width:900px){.checker-wrap{grid-template-columns:1fr}.sidebar{position:static}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-hero">
+  <div style="max-width:1260px;margin:0 auto">
+    <h1>⌨️ Symptom Checker</h1>
+    <p>Select your symptoms and choose an AI model. For voice or image input, use <a href="{% url 'multimodal' %}" style="color:#93c5fd;font-weight:700">Multimodal Input</a>.</p>
+  </div>
+</div>
+
+{% if not model_ready %}
+<div style="max-width:1260px;margin:20px auto;padding:0 24px">
+  <div style="background:var(--danger-l);border:1px solid #fca5a5;border-radius:12px;padding:14px 18px;color:#991b1b">
+    ⚠️ <strong>ML models not ready.</strong> Run <code>python train_models.py</code> then restart.
+  </div>
+</div>
+{% else %}
+<div class="checker-wrap">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="card" style="padding:18px">
+      {% if patient %}
+      <div class="pat-bar">
+        👤 <strong>{{ user.first_name|default:user.username }}</strong>
+        {% if patient.age %} · {{ patient.age }}yr{% endif %}
+        {% if patient.gender %} · {{ patient.gender }}{% endif %}
+        {% if patient.bmi %} · BMI {{ patient.bmi }} ({{ patient.bmi_category }}){% endif %}
+      </div>
+      {% endif %}
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+        <span style="font-weight:700;font-size:.95rem">Selected</span>
+        <span class="cnt" id="cnt">0</span>
+      </div>
+      <div class="pills-box" id="pillsBox">
+        <span class="empty-note" id="emptyNote">None selected…</span>
+      </div>
+
+      <button class="analyse-btn" id="analyseBtn" onclick="doAnalyse()" disabled>🔍 Analyse Symptoms</button>
+      <button class="clear-btn" onclick="clearAll()">✕ Clear All</button>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        <a href="{% url 'multimodal' %}" style="font-size:.78rem;color:var(--purple);font-weight:600;text-decoration:none">🧬 Try Voice / Image →</a>
+      </div>
+      <p class="disc">For educational use only. Always consult a licensed physician.</p>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div>
+    <div style="background:#fff;border-radius:var(--radius);border:1px solid var(--border);padding:14px 16px;margin-bottom:14px">
+      <div class="search-wrap" style="margin:0">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input class="search-input" type="text" id="searchBox" placeholder="Search symptoms…" oninput="filterChips(this.value)">
+      </div>
+    </div>
+
+    <!-- Custom Symptom Description Area -->
+    <div style="background:#fff;border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-bottom:14px">
+      <label style="font-weight:700;font-size:0.92rem;color:var(--text);display:block;margin-bottom:8px">✍️ Describe Symptoms in Your Own Words</label>
+      <div style="display:flex;gap:12px;align-items:stretch">
+        <textarea id="symptomTextBox" class="form-control" rows="3" placeholder="Type how you are feeling (e.g. 'My hemoglobin levels are 8.0, I feel extremely fatigued, and my joints hurt')" style="resize:none;font-size:0.88rem;border:2px solid var(--border);border-radius:10px;flex:1" oninput="toggleAnalyseBtn()"></textarea>
+        <button class="analyse-btn" id="textareaAnalyseBtn" onclick="doAnalyse()" disabled style="width:140px;margin-top:0;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px">🔍 Analyse</button>
+      </div>
+    </div>
+
+    <div class="loading" id="loading"><div class="spinner"></div><p style="margin-top:10px">Analysing symptoms…</p></div>
+
+    <div class="result-box" id="resultBox">
+      <div class="res-head">
+        <div style="font-size:.68rem;opacity:.7;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Predicted Condition</div>
+        <h2 id="rDisease">—</h2>
+        <div class="sub" id="rSub">—</div>
+        <div style="font-size:.8rem;opacity:.8;margin-top:12px">Confidence: <strong id="rConf">—</strong></div>
+        <div class="conf-bar"><div class="conf-fill" id="rBar"></div></div>
+      </div>
+      <div class="res-body">
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <span class="badge badge-primary" id="rSev">—</span>
+          <span class="badge badge-success" id="rMod">—</span>
+          <span class="badge" id="rAction" style="background:var(--warn-l);color:var(--warn)">—</span>
+        </div>
+        <div style="font-weight:700;margin-bottom:8px;font-size:.9rem">Precautions</div>
+        <ul class="prec-list" id="rPrec"></ul>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <a id="rLink" href="#" class="btn btn-primary">📋 View Full Report →</a>
+          <a href="{% url 'hospitals' %}" class="btn btn-accent">🏥 Hospitals</a>
+          <button class="btn btn-outline" onclick="clearAll()">Check Again</button>
+        </div>
+        <p class="disc">AI prediction for educational purposes only. Not a substitute for professional medical advice.</p>
+      </div>
+    </div>
+
+    <div class="sym-area">
+      {% for letter, syms in grouped_symptoms.items %}
+      <div class="group" id="grp{{ letter }}">
+        <div class="group-hdr">{{ letter }}</div>
+        <div class="chips">
+          {% for s in syms %}
+          <span class="chip" data-sym="{{ s }}" onclick="toggle(this)">{{ s|sym_label }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+const selected=new Set();
+function fmt(s){return s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
+function toggle(el){
+  const s=el.dataset.sym;
+  if(selected.has(s)){selected.delete(s);el.classList.remove('active');}
+  else{selected.add(s);el.classList.add('active');}
+  updateSidebar();
+}
+function toggleAnalyseBtn() {
+  const text = document.getElementById('symptomTextBox').value.trim();
+  const btn = document.getElementById('analyseBtn');
+  const btn2 = document.getElementById('textareaAnalyseBtn');
+  const isDisabled = (selected.size < 2 && text.length === 0);
+  if (btn) btn.disabled = isDisabled;
+  if (btn2) btn2.disabled = (text.length === 0);
+}
+function updateSidebar(){
+  const box=document.getElementById('pillsBox');
+  const note=document.getElementById('emptyNote');
+  document.getElementById('cnt').textContent=selected.size;
+  toggleAnalyseBtn();
+  box.querySelectorAll('.pill').forEach(p=>p.remove());
+  if(selected.size===0){note.style.display='';return;}
+  note.style.display='none';
+  selected.forEach(s=>{
+    const p=document.createElement('span');p.className='pill';
+    p.innerHTML=fmt(s)+' <span class="pill-x" onclick="removeSym(\''+s+'\')">✕</span>';
+    box.appendChild(p);
+  });
+}
+function removeSym(s){
+  selected.delete(s);
+  const chip=document.querySelector('.chip[data-sym="'+s+'"]');
+  if(chip)chip.classList.remove('active');
+  updateSidebar();
+}
+function clearAll(){
+  selected.clear();
+  document.querySelectorAll('.chip.active').forEach(c=>c.classList.remove('active'));
+  document.getElementById('symptomTextBox').value = '';
+  updateSidebar();
+  document.getElementById('resultBox').classList.remove('show');
+  document.getElementById('loading').style.display='none';
+  document.getElementById('searchBox').value='';filterChips('');
+}
+function filterChips(q){
+  q=q.toLowerCase().trim();
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('hidden',q&&!c.dataset.sym.includes(q)));
+  document.querySelectorAll('.group').forEach(g=>{
+    g.style.display=g.querySelectorAll('.chip:not(.hidden)').length?'':'none';
+  });
+}
+async function doAnalyse(){
+  const text = document.getElementById('symptomTextBox').value.trim();
+  if(selected.size < 2 && !text) return;
+  const model = 'Best Model';
+  document.getElementById('loading').style.display='block';
+  document.getElementById('resultBox').classList.remove('show');
+  document.getElementById('analyseBtn').disabled=true;
+  const btn2 = document.getElementById('textareaAnalyseBtn');
+  if (btn2) btn2.disabled=true;
+  try{
+    const r=await fetch("{% url 'predict' %}",{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'X-CSRFToken':'{{ csrf_token }}'
+      },
+      body:JSON.stringify({
+        symptoms:[...selected],
+        model:model,
+        extra_text:text,
+        input_mode: text ? 'multimodal' : 'manual'
+      })
+    });
+    const d=await r.json();
+    document.getElementById('loading').style.display='none';
+    document.getElementById('analyseBtn').disabled=false;
+    const btn2 = document.getElementById('textareaAnalyseBtn');
+    if (btn2) btn2.disabled=false;
+    if(d.error){alert('Error: '+d.error);return;}
+    document.getElementById('rDisease').textContent=d.disease;
+    document.getElementById('rSub').textContent='Analysed with '+d.model_used;
+    document.getElementById('rConf').textContent=d.confidence+'%';
+    document.getElementById('rBar').style.width=Math.min(d.confidence,100)+'%';
+    document.getElementById('rSev').textContent=d.severity;
+    document.getElementById('rMod').textContent=d.model_used;
+    const aEl=document.getElementById('rAction');
+    if(d.action_level==='emergency'){aEl.textContent='🚨 Emergency';aEl.style.background='var(--danger-l)';aEl.style.color='var(--danger)';}
+    else if(d.action_level==='see_doctor'){aEl.textContent='🏥 See Doctor';aEl.style.background='var(--warn-l)';aEl.style.color='var(--warn)';}
+    else{aEl.textContent='🏠 Home Care';aEl.style.background='var(--accent-l)';aEl.style.color='var(--accent)';}
+    document.getElementById('rLink').href='/result/'+d.check_id+'/';
+    const ul=document.getElementById('rPrec');ul.innerHTML='';
+    (d.precautions||[]).forEach(p=>{const li=document.createElement('li');li.innerHTML='<span style="color:var(--accent);font-weight:700;flex-shrink:0">✓</span><span>'+p+'</span>';ul.appendChild(li);});
+    document.getElementById('resultBox').classList.add('show');
+    document.getElementById('resultBox').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }catch(e){
+    document.getElementById('loading').style.display='none';
+    document.getElementById('analyseBtn').disabled=false;
+    const btn2 = document.getElementById('textareaAnalyseBtn');
+    if (btn2) btn2.disabled=false;
+    alert('Network error: '+e.message);
+  }
+}
+</script>
+{% endblock %}

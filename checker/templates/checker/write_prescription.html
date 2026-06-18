@@ -1,0 +1,70 @@
+{% extends 'checker/base.html' %}
+{% block title %}Write Prescription — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .pres-wrap { max-width: 800px; margin: 40px auto; }
+  .pres-card { background: #fff; padding: 30px; border-radius: 16px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .pres-header { border-bottom: 2px solid var(--primary); padding-bottom: 20px; margin-bottom: 20px; }
+  .med-row { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; margin-bottom: 10px; align-items: center; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pres-wrap">
+  <div class="pres-card">
+    <div class="pres-header">
+      <h2>✍️ Write Prescription</h2>
+      <p style="color:var(--muted)">Patient: <strong>{{ consultation.patient.get_full_name|default:consultation.patient.username }}</strong> | Date: {% now "M d, Y" %}</p>
+    </div>
+    
+    <form method="post" onsubmit="prepareJson()">
+      {% csrf_token %}
+      <div class="form-group">
+        <label>Clinical Notes / Diagnosis / Advice</label>
+        <textarea name="prescription_notes" class="form-control" rows="4" placeholder="Patient presented with... Advised to..."></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label>Medications (JSON Format for now, or just list them here and we parse it)</label>
+        <div id="med-container">
+          <div class="med-row">
+            <input type="text" class="form-control med-name" placeholder="Medicine Name (e.g., Paracetamol 500mg)">
+            <input type="text" class="form-control med-dos" placeholder="Dosage (e.g., 1-0-1)">
+            <input type="text" class="form-control med-dur" placeholder="Duration (e.g., 5 days)">
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">X</button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px" onclick="addMedRow()">+ Add Medicine</button>
+        <input type="hidden" name="prescription_meds" id="meds_json">
+      </div>
+      
+      <button type="submit" class="btn btn-primary" style="width:100%">Generate Digital Prescription</button>
+    </form>
+  </div>
+</div>
+
+<script>
+function addMedRow() {
+  const div = document.createElement('div');
+  div.className = 'med-row';
+  div.innerHTML = `
+    <input type="text" class="form-control med-name" placeholder="Medicine Name">
+    <input type="text" class="form-control med-dos" placeholder="Dosage">
+    <input type="text" class="form-control med-dur" placeholder="Duration">
+    <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">X</button>
+  `;
+  document.getElementById('med-container').appendChild(div);
+}
+
+function prepareJson() {
+  const rows = document.querySelectorAll('.med-row');
+  const meds = [];
+  rows.forEach(r => {
+    const name = r.querySelector('.med-name').value;
+    const dos = r.querySelector('.med-dos').value;
+    const dur = r.querySelector('.med-dur').value;
+    if (name) meds.push({name, dosage: dos, duration: dur});
+  });
+  document.getElementById('meds_json').value = JSON.stringify(meds);
+}
+</script>
+{% endblock %}

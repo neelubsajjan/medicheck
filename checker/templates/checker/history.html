@@ -1,0 +1,81 @@
+{% extends 'checker/base.html' %}
+{% load checker_tags %}
+{% block title %}History — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .hist-wrap{max-width:1100px;margin:0 auto;padding:32px 24px 80px}
+  .hist-table{width:100%;border-collapse:collapse}
+  .hist-table th{text-align:left;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+                 color:var(--muted);padding:10px 14px;border-bottom:2px solid var(--border);background:var(--bg)}
+  .hist-table td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:.88rem}
+  .hist-table tr:hover td{background:#fafbff}
+  .hist-table tr:last-child td{border-bottom:none}
+  .mode-icon{font-size:1rem}
+  a.row-link{color:var(--primary);font-weight:600;text-decoration:none;font-size:.8rem}
+  a.row-link:hover{text-decoration:underline}
+</style>
+{% endblock %}
+{% block content %}
+<div class="hist-wrap">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+    <div>
+      <h1 style="font-size:1.8rem">📋 Diagnosis History</h1>
+      <p style="color:var(--muted);margin-top:4px">All your past AI symptom analyses</p>
+    </div>
+    <a href="{% url 'symptom_checker' %}" class="btn btn-primary">+ New Check</a>
+  </div>
+  {% if records %}
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="overflow-x:auto">
+      <table class="hist-table">
+        <thead>
+          <tr>
+            <th>Mode</th><th>Condition</th><th>Confidence</th>
+            <th>Severity</th><th>Action</th><th>Date</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td>
+              <span class="mode-icon">
+                {% if r.input_mode == 'voice' %}🎤{% elif r.input_mode == 'image' %}📸{% elif r.input_mode == 'video' %}🎥{% elif r.input_mode == 'multimodal' %}🧬{% else %}⌨️{% endif %}
+              </span>
+              <span style="font-size:.75rem;color:var(--muted);margin-left:4px">{{ r.input_mode|title }}</span>
+            </td>
+            <td><strong>{{ r.predicted_disease }}</strong></td>
+            <td>{{ r.confidence }}%</td>
+            <td>
+              <span class="badge {% if r.severity == 'High' %}badge-danger{% elif r.severity == 'Moderate' %}badge-warn{% else %}badge-success{% endif %}">
+                {{ r.severity }}
+              </span>
+            </td>
+            <td>
+              <span class="badge {% if r.action_level == 'emergency' %}badge-danger{% elif r.action_level == 'see_doctor' %}badge-warn{% else %}badge-success{% endif %}">
+                {{ r.action_level|sym_label }}
+              </span>
+            </td>
+            <td style="color:var(--muted)">{{ r.created_at|date:"M d, Y" }}</td>
+            <td style="display:flex; gap: 8px; align-items: center;">
+              <a href="{% url 'result' r.id %}" class="row-link">View →</a>
+              <form method="post" action="{% url 'delete_history' r.id %}" onsubmit="return confirm('Delete this record?')" style="margin:0;">
+                {% csrf_token %}
+                <button type="submit" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem;padding:0 5px;" title="Delete">🗑️</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center;padding:60px">
+    <div style="font-size:3rem;margin-bottom:14px">🩺</div>
+    <h3>No history yet</h3>
+    <p style="color:var(--muted);margin:8px 0 20px">Start your first symptom analysis</p>
+    <a href="{% url 'symptom_checker' %}" class="btn btn-primary">Check Symptoms</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

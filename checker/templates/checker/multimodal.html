@@ -1,0 +1,728 @@
+{% extends 'checker/base.html' %}
+{% load checker_tags %}
+{% block title %}Multimodal Input — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .mm-hero{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;padding:40px 24px 32px;text-align:center}
+  .mm-hero h1{font-size:2rem;font-weight:800}
+  .mm-hero p{opacity:.85;margin-top:8px;max-width:560px;margin-left:auto;margin-right:auto}
+  .tabs-wrap{max-width:960px;margin:0 auto;padding:32px 24px 80px}
+  .tab-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px}
+  .tab-btn{padding:14px 10px;border-radius:12px;border:2px solid var(--border);background:#fff;
+           cursor:pointer;text-align:center;transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif}
+  .tab-btn .t-icon{font-size:1.6rem;display:block;margin-bottom:6px}
+  .tab-btn .t-label{font-size:.82rem;font-weight:700;color:var(--muted)}
+  .tab-btn.active{border-color:var(--purple);background:var(--purple-l)}
+  .tab-btn.active .t-label{color:var(--purple)}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block;animation:fadeIn .3s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* Voice */
+  .voice-prompts{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+  .prompt-pill{background:var(--purple-l);color:var(--purple);border:1px solid #c4b5fd;
+               border-radius:999px;padding:6px 14px;font-size:.82rem;font-weight:600;
+               cursor:pointer;transition:all .2s}
+  .prompt-pill:hover{background:var(--purple);color:#fff}
+  .voice-btn{width:80px;height:80px;border-radius:50%;background:var(--purple);color:#fff;border:none;
+             cursor:pointer;font-size:2rem;display:flex;align-items:center;justify-content:center;
+             margin:20px auto;transition:all .2s;box-shadow:0 4px 20px rgba(124,58,237,.3)}
+  .voice-btn:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(124,58,237,.45)}
+  .voice-btn.recording{background:#ef4444;animation:pulse 1s ease infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 4px 20px rgba(239,68,68,.4)}50%{box-shadow:0 0 0 14px rgba(239,68,68,.1)}}
+  .transcript-box{min-height:80px;border:2px dashed var(--border);border-radius:12px;padding:14px;
+                  background:var(--bg);color:var(--text);font-size:.9rem;line-height:1.6;margin-top:12px;
+                  outline:none}
+  .transcript-box:focus{border-color:var(--purple)}
+  .transcript-box[data-placeholder]:empty:before{content:attr(data-placeholder);color:var(--muted);pointer-events:none}
+
+  /* Audio upload zone */
+  .audio-upload-zone{border:2px dashed var(--border);border-radius:16px;padding:28px 20px;text-align:center;
+                     background:var(--bg);cursor:pointer;transition:all .2s;position:relative;margin-bottom:14px}
+  .audio-upload-zone:hover,.audio-upload-zone.drag-over{border-color:var(--purple);background:var(--purple-l)}
+  .audio-upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .audio-preview{margin-top:12px;display:none}
+  .audio-preview audio{width:100%;border-radius:10px}
+  .audio-info{font-size:.78rem;color:var(--muted);margin-top:4px}
+
+  /* Image */
+  .upload-zone{border:2px dashed var(--border);border-radius:16px;padding:40px 20px;text-align:center;
+               background:var(--bg);cursor:pointer;transition:all .2s;position:relative}
+  .upload-zone:hover,.upload-zone.drag-over{border-color:var(--purple);background:var(--purple-l)}
+  .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .upload-zone .u-icon{font-size:3rem;display:block;margin-bottom:10px}
+  .upload-zone h3{font-size:1rem;font-weight:700;margin-bottom:4px}
+  .upload-zone p{font-size:.82rem;color:var(--muted)}
+
+  /* Findings */
+  .findings-box{margin-top:20px;display:none}
+  .finding-tag{display:inline-flex;align-items:center;gap:6px;background:var(--accent-l);
+               color:var(--accent);border-radius:999px;padding:5px 13px;font-size:.82rem;font-weight:600;margin:3px}
+  .sym-found{display:inline-flex;align-items:center;gap:6px;background:var(--primary-l);
+             color:var(--primary);border-radius:999px;padding:5px 13px;font-size:.82rem;font-weight:600;margin:3px}
+
+  /* Voice result card */
+  .voice-result-card{margin-top:20px;border-radius:14px;overflow:hidden;display:none;border:1px solid var(--border)}
+  .voice-res-head{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;padding:18px 22px}
+  .voice-res-head h4{font-size:1.3rem;font-weight:800;margin:0}
+  .voice-res-body{padding:16px 22px;background:#fff}
+
+  /* Collected symptoms */
+  .collected{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:20px}
+  .coll-pill{background:var(--primary);color:#fff;border-radius:999px;padding:4px 10px;
+             font-size:.78rem;font-weight:500;margin:3px;display:inline-flex;align-items:center;gap:4px}
+  .coll-x{cursor:pointer;opacity:.75}
+  .coll-x:hover{opacity:1}
+
+  .analyse-big{width:100%;padding:16px;font-size:1.05rem;border-radius:14px;
+               background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;
+               border:none;font-weight:800;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;
+               margin-top:16px;transition:all .25s;letter-spacing:-.01em}
+  .analyse-big:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,99,235,.35)}
+  .analyse-big:disabled{opacity:.4;cursor:not-allowed}
+
+  /* Scan UI */
+  .scan-container{position:relative;overflow:hidden;border-radius:12px;margin-top:14px;display:none;background:#0f172a}
+  .scan-bar{position:absolute;top:0;left:0;width:100%;height:3px;background:var(--primary);
+            box-shadow:0 0 10px 2px rgba(59,130,246,0.8);animation:scan 1.5s infinite linear}
+  @keyframes scan{0%{top:0}50%{top:100%}100%{top:0}}
+  .scan-img{max-width:100%;max-height:240px;display:block;opacity:0.8;
+            filter:sepia(0.3) hue-rotate(180deg) saturate(200%)}
+  .scan-text{position:absolute;bottom:10px;left:10px;color:#38bdf8;font-family:monospace;
+             font-size:0.8rem;text-shadow:0 0 5px rgba(0,0,0,1)}
+
+  .spinner-sm{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);
+              border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;
+              vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media(max-width:640px){.tab-btns{grid-template-columns:1fr 1fr}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="mm-hero">
+  <h1>&#x1F9EC; Multimodal Symptom Input</h1>
+  <p>Describe your symptoms through voice, image, or manual entry &mdash; AI analyses all inputs together for accurate diagnosis.</p>
+</div>
+
+{% if not model_ready %}
+<div style="max-width:960px;margin:20px auto;padding:0 24px">
+  <div style="background:var(--danger-l);border:1px solid #fca5a5;border-radius:12px;padding:14px 18px;color:#991b1b">
+    &#x26A0;&#xFE0F; Run <code>python train_models.py</code> first, then restart the server.
+  </div>
+</div>
+{% else %}
+<div class="tabs-wrap">
+  <!-- Tab buttons -->
+  <div class="tab-btns">
+    <div class="tab-btn active" onclick="switchTab('manual')">
+      <span class="t-icon">&#x2328;&#xFE0F;</span><span class="t-label">Manual</span>
+    </div>
+    <div class="tab-btn" onclick="switchTab('voice')">
+      <span class="t-icon">&#x1F3A4;</span><span class="t-label">Voice</span>
+    </div>
+    <div class="tab-btn" onclick="switchTab('image')">
+      <span class="t-icon">&#x1F4F8;</span><span class="t-label">Image</span>
+    </div>
+  </div>
+
+  <!-- MANUAL TAB -->
+  <div class="tab-panel active card" id="tab-manual">
+    <h3 style="margin-bottom:14px">Select symptoms manually</h3>
+    <input type="text" id="manualSearch" class="form-control" placeholder="Search symptoms&#x2026;" oninput="filterManual(this.value)" style="margin-bottom:14px">
+    <div id="manualGroups" style="max-height:380px;overflow-y:auto;padding-right:4px">
+      {% for letter, syms in grouped_symptoms.items %}
+      <div class="mgroup" id="mgrp{{ letter }}">
+        <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:6px 0 6px;border-bottom:1px solid var(--border);margin-bottom:8px">{{ letter }}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px">
+          {% for s in syms %}
+          <span class="chip" data-sym="{{ s }}" onclick="toggleSym(this)"
+                style="padding:6px 12px;border-radius:999px;border:2px solid var(--border);
+                       background:#fff;font-size:.8rem;cursor:pointer;transition:all .15s;
+                       font-family:'Plus Jakarta Sans',sans-serif;font-weight:500">
+            {{ s|sym_label }}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- VOICE TAB -->
+  <div class="tab-panel card" id="tab-voice">
+    <h3 style="margin-bottom:6px">&#x1F3A4; Voice / Audio Symptom Input</h3>
+    <p style="color:var(--muted);font-size:.88rem;margin-bottom:14px">Record your voice, upload an audio file, or type your symptoms below. AI will directly diagnose you.</p>
+
+    <!-- Audio file upload zone -->
+    <div class="audio-upload-zone" id="audioZone">
+      <input type="file" accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg" id="audioFile" onchange="handleAudioFile(this)">
+      <span style="font-size:1.8rem;display:block;margin-bottom:6px">&#x1F4C1;</span>
+      <div style="font-size:.9rem;font-weight:700;margin-bottom:3px">Drop audio file or click to browse</div>
+      <div style="font-size:.78rem;color:var(--muted)">Supports MP3, WAV, M4A, WebM</div>
+    </div>
+    <div class="audio-preview" id="audioPreview">
+      <audio id="audioPlayer" controls></audio>
+      <div class="audio-info" id="audioInfo"></div>
+    </div>
+
+    <!-- Mic recording -->
+    <div style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Or speak into microphone</div>
+    <button class="voice-btn" id="micBtn" onclick="toggleMic()" title="Click to record">&#x1F3A4;</button>
+    <div style="text-align:center;font-size:.82rem;color:var(--muted);margin-top:-10px;margin-bottom:12px" id="micStatus">Click mic to start recording</div>
+
+    <!-- Suggested phrases -->
+    <div style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Or type / click a phrase</div>
+    <div class="voice-prompts" id="voicePrompts"></div>
+
+    <!-- Editable transcript with prominent label -->
+    <div style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">
+      Your symptoms <span style="color:var(--primary);font-weight:800">*</span>
+    </div>
+    <div class="transcript-box" id="transcriptBox" contenteditable="true"
+         data-placeholder="Type your symptoms here, e.g. 'I have fever, headache and body ache'&#x2026;"
+         style="min-height:120px;border:2px solid var(--border);"></div>
+    <div style="font-size:.75rem;color:var(--muted);margin-top:6px;font-style:italic">
+      💡 If speech-to-text doesn't work, just type your symptoms above and click Analyse
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-primary" style="flex:1;justify-content:center" id="voiceAnalyseBtn" onclick="analyseVoice()">
+        &#x1F9E0; Analyse &amp; Diagnose
+      </button>
+      <button class="btn btn-outline" onclick="clearVoice()">Clear</button>
+    </div>
+
+    <!-- Voice diagnosis result card -->
+    <div class="voice-result-card" id="voiceResultCard">
+      <div class="voice-res-head">
+        <div style="font-size:.68rem;opacity:.75;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">AI Voice Diagnosis</div>
+        <h4 id="vr-disease">&mdash;</h4>
+        <div style="font-size:.82rem;opacity:.85;margin-top:4px" id="vr-model">&mdash;</div>
+      </div>
+      <div class="voice-res-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <span class="badge badge-primary" id="vr-conf">&mdash;</span>
+          <span class="badge" id="vr-sev" style="background:var(--warn-l);color:var(--warn)">&mdash;</span>
+          <span class="badge badge-purple" id="vr-action">&mdash;</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:999px;overflow:hidden;margin-bottom:14px">
+          <div id="vr-bar" style="height:100%;width:0%;background:var(--purple);border-radius:999px;transition:width .8s"></div>
+        </div>
+        <div id="vr-transcript-display" style="font-size:.85rem;color:var(--muted);margin-bottom:12px;font-style:italic;display:none"></div>
+        <div id="vr-notice" style="display:none;background:var(--warn-l);border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;color:#92400e;font-size:.82rem;margin-bottom:12px"></div>
+        <div id="vr-syms" style="margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a id="vr-link" href="#" class="btn btn-primary" style="display:none">&#x1F4CB; View Full Clinical Report</a>
+          <a href="/hospitals/" class="btn btn-accent">&#x1F3E5; Find Hospitals</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMAGE TAB -->
+  <div class="tab-panel card" id="tab-image">
+    <h3 style="margin-bottom:6px">&#x1F4F8; Image-Based Symptom Detection</h3>
+    <p style="color:var(--muted);font-size:.88rem;margin-bottom:16px">Upload a photo showing visible symptoms (skin rash, eye redness, etc.). AI will analyze for visual indicators.</p>
+    <div class="upload-zone" id="imgZone">
+      <input type="file" accept="image/*" id="imageFile" onchange="previewImage(this)">
+      <span class="u-icon">&#x1F5BC;&#xFE0F;</span>
+      <h3>Drop image or click to browse</h3>
+      <p>Supports JPG, PNG, WebP</p>
+    </div>
+    <div id="imgPreviewCont" class="scan-container">
+      <img id="imgPreview" class="scan-img" alt="Preview">
+      <div class="scan-bar" id="imgScanBar"></div>
+      <div class="scan-text" id="imgScanText">AWAITING IMAGE...</div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:14px;justify-content:center" onclick="analyseImage()">&#x1F52C; Analyse Image</button>
+    <div class="findings-box" id="imageFindingsBox">
+      <h4 style="margin-bottom:10px">&#x1F52C; Visual Analysis Results</h4>
+      <div id="imageFindings"></div>
+    </div>
+  </div>
+
+  <!-- Collected Symptoms & Analyse -->
+  <div class="collected" id="collectedBox">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <strong>&#x1F9EA; Collected Symptoms (<span id="symCount">0</span>)</strong>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="mmModel" class="form-control" style="width:auto;font-size:.82rem;padding:6px 10px">
+          {% for name in model_names %}<option value="{{ name }}"{% if forloop.first %} selected{% endif %}>{{ name }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="clearAllSyms()">Clear</button>
+      </div>
+    </div>
+    <div id="collectedPills" style="min-height:28px">
+      <span style="color:var(--muted);font-size:.82rem;font-style:italic">No symptoms yet &mdash; use any input tab above</span>
+    </div>
+    <button class="analyse-big" id="mmAnalyseBtn" onclick="runMMAnalysis()" disabled>
+      &#x1F680; Analyse All Symptoms with AI
+    </button>
+  </div>
+
+  <!-- Result display -->
+  <div id="mmResult" style="display:none;margin-top:20px"></div>
+</div>
+{% endif %}
+
+<script>
+const collected = new Set();
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let recordedBlob = null;
+let uploadedAudioFile = null;
+
+// Voice prompt pills
+(function initVoicePrompts() {
+  const phrases = [
+    "I have fever and headache",
+    "I feel chest pain and breathlessness",
+    "I have nausea and vomiting",
+    "I have joint pain and swelling",
+    "I feel dizzy and weak",
+    "I have a sore throat and runny nose",
+    "I have skin rash and itching",
+    "I feel severe abdominal pain"
+  ];
+  const box = document.getElementById('voicePrompts');
+  if (box) {
+    box.innerHTML = phrases.map(p =>
+      `<span class="prompt-pill" onclick="setTranscript('${p.replace(/'/g, "\\'")}')">${p}</span>`
+    ).join('');
+  }
+})();
+
+// Tab switching
+function switchTab(t){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  const idx={'manual':0,'voice':1,'image':2}[t];
+  document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+}
+
+// Manual tab chips
+function toggleSym(el){
+  const s=el.dataset.sym;
+  if(collected.has(s)){collected.delete(s);el.style.background='#fff';el.style.borderColor='var(--border)';el.style.color='var(--text)';}
+  else{collected.add(s);el.style.background='var(--primary)';el.style.borderColor='var(--primary)';el.style.color='#fff';}
+  updateCollected();
+}
+function addSymptoms(syms){syms.forEach(s=>{if(s)collected.add(s)});updateCollected();}
+function removeSym(s){
+  collected.delete(s);
+  const chip=document.querySelector('.chip[data-sym="'+s+'"]');
+  if(chip){chip.style.background='#fff';chip.style.borderColor='var(--border)';chip.style.color='var(--text)';}
+  updateCollected();
+}
+function clearAllSyms(){
+  collected.clear();
+  document.querySelectorAll('.chip').forEach(c=>{c.style.background='#fff';c.style.borderColor='var(--border)';c.style.color='var(--text)';});
+  updateCollected();
+}
+function updateCollected(){
+  const box=document.getElementById('collectedPills');
+  const cnt=document.getElementById('symCount');
+  const btn=document.getElementById('mmAnalyseBtn');
+  cnt.textContent=collected.size;
+  btn.disabled=collected.size<2;
+  if(collected.size===0){box.innerHTML='<span style="color:var(--muted);font-size:.82rem;font-style:italic">No symptoms yet &mdash; use any input tab above</span>';return;}
+  box.innerHTML=[...collected].map(s=>`<span class="coll-pill">${s.replace(/_/g,' ')} <span class="coll-x" onclick="removeSym('${s.replace(/'/g,"\\'")}')">&times;</span></span>`).join('');
+}
+function filterManual(q){
+  q=q.toLowerCase().trim();
+  document.querySelectorAll('.chip').forEach(c=>{
+    c.style.display=(!q||c.dataset.sym.includes(q))?'':'none';
+  });
+  document.querySelectorAll('.mgroup').forEach(g=>{
+    g.style.display=g.querySelectorAll('.chip:not([style*="display: none"])').length?'':'none';
+  });
+}
+
+// Voice helpers
+function getTranscriptText(){return document.getElementById('transcriptBox').textContent.trim();}
+function setTranscript(text){document.getElementById('transcriptBox').textContent=text;}
+function clearVoice(){
+  document.getElementById('transcriptBox').textContent='';
+  document.getElementById('audioPreview').style.display='none';
+  document.getElementById('audioPlayer').src='';
+  document.getElementById('audioInfo').textContent='';
+  document.getElementById('voiceResultCard').style.display='none';
+  recordedBlob=null; uploadedAudioFile=null;
+  document.getElementById('audioFile').value='';
+}
+
+// Audio file upload
+function handleAudioFile(input){
+  const file=input.files[0]; if(!file)return;
+  uploadedAudioFile=file; recordedBlob=null;
+  const url=URL.createObjectURL(file);
+  document.getElementById('audioPlayer').src=url;
+  document.getElementById('audioPreview').style.display='block';
+  document.getElementById('audioInfo').innerHTML=
+    file.name+' ('+(file.size/1024).toFixed(1)+' KB)'+
+    ' &mdash; <span style="color:#d97706;font-weight:600">&#9888; No Gemini key? Also type your symptoms in the box below.</span>';
+  // Focus the transcript box to prompt the user to type
+  setTimeout(()=>{
+    const tb=document.getElementById('transcriptBox');
+    if(tb && !tb.textContent.trim()) tb.focus();
+  },300);
+}
+
+// Drag & drop — audio
+(function(){
+  const zone=document.getElementById('audioZone');
+  if(!zone)return;
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop',e=>{
+    e.preventDefault();zone.classList.remove('drag-over');
+    const file=e.dataTransfer.files[0];
+    if(file&&file.type.startsWith('audio')){
+      uploadedAudioFile=file;recordedBlob=null;
+      document.getElementById('audioPlayer').src=URL.createObjectURL(file);
+      document.getElementById('audioPreview').style.display='block';
+      document.getElementById('audioInfo').textContent=file.name+' ('+(file.size/1024).toFixed(1)+' KB)';
+    }
+  });
+})();
+
+// Drag & drop — image
+(function(){
+  const zone=document.getElementById('imgZone');
+  if(!zone)return;
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop',e=>{
+    e.preventDefault();zone.classList.remove('drag-over');
+    const file=e.dataTransfer.files[0];
+    if(file&&file.type.startsWith('image')){
+      const dt=new DataTransfer();dt.items.add(file);
+      document.getElementById('imageFile').files=dt.files;
+      previewImage(document.getElementById('imageFile'));
+    }
+  });
+})();
+
+// MediaRecorder + live SpeechRecognition (dual capture)
+let liveTranscript = '';
+async function toggleMic(){
+  if(isRecording){
+    if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    audioChunks = [];
+    liveTranscript = '';
+
+    // MediaRecorder for the audio blob
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm';
+    mediaRecorder = new MediaRecorder(stream, {mimeType});
+    mediaRecorder.ondataavailable = e => { if(e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      recordedBlob = new Blob(audioChunks, {type: mimeType});
+      uploadedAudioFile = null;
+      document.getElementById('audioPlayer').src = URL.createObjectURL(recordedBlob);
+      document.getElementById('audioPreview').style.display = 'block';
+      document.getElementById('audioInfo').textContent = 'Recorded audio ready';
+      isRecording = false;
+      document.getElementById('micBtn').classList.remove('recording');
+      document.getElementById('micBtn').innerHTML = '&#x1F3A4;';
+      document.getElementById('micStatus').textContent = 'Recording stopped. Click Analyse & Diagnose.';
+      // Put the live transcript into the text box if we captured any
+      if(liveTranscript) document.getElementById('transcriptBox').textContent = liveTranscript;
+    };
+    mediaRecorder.start();
+
+    // Live SpeechRecognition alongside MediaRecorder
+    let speechRecognitionActive = false;
+    if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const sr = new SR();
+      sr.lang = 'en-US';
+      sr.continuous = true;
+      sr.interimResults = true;
+      sr.maxAlternatives = 1;
+      
+      sr.onstart = () => {
+        console.log('Speech recognition started');
+        speechRecognitionActive = true;
+        document.getElementById('micStatus').textContent = 'Recording... speech-to-text active ✓';
+      };
+      
+      sr.onresult = e => {
+        console.log('Speech recognition result:', e.results);
+        let interimTranscript = '';
+        let finalTranscript = '';
+        
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+          if (e.results[i].isFinal) {
+            finalTranscript += e.results[i][0].transcript;
+          } else {
+            interimTranscript += e.results[i][0].transcript;
+          }
+        }
+        
+        liveTranscript = finalTranscript || interimTranscript;
+        if (liveTranscript) {
+          document.getElementById('transcriptBox').textContent = liveTranscript;
+          document.getElementById('micStatus').textContent = 'Recording... speech detected ✓';
+        }
+      };
+      
+      sr.onerror = e => {
+        console.error('Speech recognition error:', e.error, e.message);
+        speechRecognitionActive = false;
+        let errorMsg = 'Speech-to-text error';
+        if (e.error === 'not-allowed') errorMsg = 'Microphone permission denied';
+        else if (e.error === 'no-speech') errorMsg = 'No speech detected';
+        else if (e.error === 'network') errorMsg = 'Network error for speech-to-text';
+        else if (e.error === 'aborted') errorMsg = 'Speech recognition aborted';
+        
+        document.getElementById('micStatus').textContent = `Recording... (${errorMsg}, type manually)`;
+      };
+      
+      sr.onend = () => {
+        console.log('Speech recognition ended');
+        speechRecognitionActive = false;
+        // Restart if still recording (some browsers stop it automatically)
+        if(isRecording && mediaRecorder && mediaRecorder.state === 'recording'){
+          try {
+            sr.start();
+          } catch(e){
+            console.log('Could not restart speech recognition:', e);
+          }
+        }
+      };
+      
+      try {
+        sr.start();
+      } catch(e) {
+        console.error('Failed to start speech recognition:', e);
+        document.getElementById('micStatus').textContent = 'Recording... (speech-to-text failed to start)';
+      }
+      
+      // Stop speech recognition when MediaRecorder stops
+      mediaRecorder.addEventListener('stop', () => { 
+        try { sr.stop(); } catch(e){} 
+      }, {once:true});
+    } else {
+      document.getElementById('micStatus').textContent = 'Recording... (browser does not support speech-to-text)';
+    }
+
+    isRecording = true;
+    document.getElementById('micBtn').classList.add('recording');
+    document.getElementById('micBtn').textContent = '[STOP]';
+    document.getElementById('micStatus').textContent = 'Recording... speak clearly, click again to stop';
+  } catch(err) {
+    alert('Microphone access denied or not available: '+err.message+'\n\nYou can still type your symptoms in the box below.');
+  }
+}
+
+// Voice AI Analyse — direct diagnosis
+async function analyseVoice(){
+  const btn = document.getElementById('voiceAnalyseBtn');
+  const text = getTranscriptText();
+  const hasAudio = recordedBlob || uploadedAudioFile;
+  if(!hasAudio && !text){
+    alert('Please record your voice, upload an audio file, or type your symptoms.');
+    return;
+  }
+  // If audio is present but no text typed, we cannot decode non-WAV without Gemini.
+  // Prompt the user to also type their symptoms.
+  if(hasAudio && !text){
+    const tb = document.getElementById('transcriptBox');
+    tb.style.border = '2px solid #d97706';
+    tb.style.background = '#fffbeb';
+    tb.setAttribute('data-placeholder', 'Please type what you said, e.g. "I have fever, headache and body ache"...');
+    tb.focus();
+    // Show a flash notice inside the result card
+    document.getElementById('voiceResultCard').style.display = 'block';
+    document.getElementById('vr-disease').textContent = 'Type Your Symptoms Below';
+    document.getElementById('vr-model').textContent = 'Offline mode — using browser speech-to-text';
+    document.getElementById('vr-conf').textContent = 'Waiting for text input';
+    document.getElementById('vr-sev').textContent = '';
+    document.getElementById('vr-action').textContent = '';
+    document.getElementById('vr-bar').style.width = '0%';
+    document.getElementById('vr-syms').innerHTML = '';
+    const nEl = document.getElementById('vr-notice');
+    nEl.style.display = 'block';
+    nEl.innerHTML = '<strong>&#128267; Audio recorded successfully!</strong><br>'+
+      'Speech-to-text may not work in all browsers. Please type your symptoms in the highlighted box above and click <strong>Analyse &amp; Diagnose</strong> again.<br>'+
+      '<em>Example: "I have fever, headache, body ache and nausea"</em>';
+    document.getElementById('vr-transcript-display').style.display = 'none';
+    document.getElementById('vr-link').style.display = 'none';
+    return;
+  }
+  // Reset transcript box style
+  const tb2 = document.getElementById('transcriptBox');
+  tb2.style.border = '';
+  tb2.style.background = '';
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> Analysing...';
+  document.getElementById('voiceResultCard').style.display = 'none';
+  document.getElementById('vr-notice').style.display = 'none';
+  document.getElementById('vr-transcript-display').style.display = 'none';
+  document.getElementById('vr-link').style.display = 'none';
+  try{
+    const fd = new FormData();
+    if(recordedBlob){
+      fd.append('audio', recordedBlob, 'recording.webm');
+    } else if(uploadedAudioFile){
+      fd.append('audio', uploadedAudioFile, uploadedAudioFile.name);
+    }
+    // ALWAYS send the transcript text as a fallback alongside audio
+    if(text) fd.append('transcript', text);
+    fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    const r = await fetch("{% url 'voice_input' %}", {method:'POST', body:fd});
+    const d = await r.json();
+    if(d.error){ alert('Error: '+d.error); return; }
+
+
+    // Fill result card
+    document.getElementById('vr-disease').textContent = d.disease || 'Unknown';
+    document.getElementById('vr-model').textContent = 'Analysed by: '+(d.model_used||'AI');
+    document.getElementById('vr-conf').textContent = 'Confidence: '+(d.confidence||0)+'%';
+    const sev = d.severity || 'Moderate';
+    const sevEl = document.getElementById('vr-sev');
+    sevEl.textContent = sev+' Severity';
+    sevEl.style.background = sev==='High'?'var(--danger-l)':sev==='Moderate'?'var(--warn-l)':'var(--accent-l)';
+    sevEl.style.color = sev==='High'?'var(--danger)':sev==='Moderate'?'var(--warn)':'var(--accent)';
+    const actionMap = {'home_care':'Home Care','see_doctor':'See Doctor','emergency':'EMERGENCY'};
+    document.getElementById('vr-action').textContent = actionMap[d.action_level] || 'See Doctor';
+    document.getElementById('vr-bar').style.width = Math.min(d.confidence||0,100)+'%';
+    if(d.transcript && d.transcript.length > 2){
+      const tEl = document.getElementById('vr-transcript-display');
+      tEl.style.display = 'block';
+      tEl.innerHTML = '<em>'+d.transcript+'</em>';
+    }
+    if(d.notice){
+      const nEl = document.getElementById('vr-notice');
+      nEl.style.display = 'block';
+      nEl.textContent = d.notice;
+    }
+    const symsEl = document.getElementById('vr-syms');
+    if(d.symptoms && d.symptoms.length){
+      symsEl.innerHTML = '<div style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Detected Symptoms</div>'+
+        d.symptoms.map(s=>`<span class="sym-found">&#x2713; ${s.replace(/_/g,' ')}</span>`).join('');
+      addSymptoms(d.symptoms);
+    } else {
+      symsEl.innerHTML = '<span style="color:var(--muted);font-size:.82rem">No specific symptom keys matched &mdash; diagnosis based on your description.</span>';
+    }
+    if(d.check_id){
+      const lnk = document.getElementById('vr-link');
+      lnk.href = '/result/'+d.check_id+'/';
+      lnk.style.display = 'inline-flex';
+    }
+    document.getElementById('voiceResultCard').style.display = 'block';
+    document.getElementById('voiceResultCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+  } catch(e) {
+    alert('Error: '+e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#x1F9E0; Analyse &amp; Diagnose';
+  }
+}
+
+
+// Image
+function previewImage(input){
+  const file=input.files[0];if(!file)return;
+  document.getElementById('imgScanBar').style.display='none';
+  document.getElementById('imgScanText').textContent='IMAGE LOADED - READY FOR ANALYSIS';
+  document.getElementById('imgPreview').src=URL.createObjectURL(file);
+  document.getElementById('imgPreviewCont').style.display='block';
+}
+
+async function analyseImage(){
+  const file=document.getElementById('imageFile').files[0];
+  if(!file){alert('Please upload an image first.');return;}
+  document.getElementById('imgScanBar').style.display='block';
+  document.getElementById('imgScanText').textContent='INITIALIZING CNN FEATURE EXTRACTION...';
+  setTimeout(()=>document.getElementById('imgScanText').textContent='ANALYZING EPIDERMAL VARIANCES...',800);
+  setTimeout(()=>document.getElementById('imgScanText').textContent='ANCHORING FACIAL LANDMARKS...',1600);
+  const fd=new FormData();fd.append('image',file);fd.append('csrfmiddlewaretoken','{{ csrf_token }}');
+  try{
+    const r=await fetch("{% url 'image_input' %}",{method:'POST',body:fd});
+    const d=await r.json();
+    setTimeout(()=>{
+      document.getElementById('imgScanBar').style.display='none';
+      document.getElementById('imgScanText').textContent='ANALYSIS COMPLETE';
+      if(d.error){alert('Error: '+d.error);return;}
+      const box=document.getElementById('imageFindingsBox');
+      const inner=document.getElementById('imageFindings');
+      box.style.display='block';
+      inner.innerHTML=
+        '<div style="margin-bottom:10px"><strong>Visual Findings:</strong><br>'+
+        (d.findings||[]).map(f=>`<span class="finding-tag">&#x1F52C; ${f}</span>`).join('')+'</div>'+
+        '<div><strong>Detected Symptoms:</strong><br>'+
+        (d.symptoms||[]).map(s=>`<span class="sym-found">&#x2713; ${s.replace(/_/g,' ')}</span>`).join('')+'</div>'+
+        `<div style="margin-top:14px;padding:14px;background:#f5f3ff;border-radius:12px;border:1px solid #ddd6fe">`+
+          `<div style="font-size:0.7rem;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:0.05em">Visual AI Diagnosis</div>`+
+          `<div style="font-size:1.2rem;font-weight:800;color:var(--text);margin-top:3px">${d.disease}</div>`+
+          `<div style="font-size:0.8rem;color:var(--muted);margin-top:4px">Confidence: <strong>${d.confidence}%</strong></div>`+
+          (d.check_id?`<div style="margin-top:10px"><a href="/result/${d.check_id}/" class="btn btn-primary btn-sm" style="padding:6px 12px;font-size:0.75rem;text-decoration:none;border-radius:8px;display:inline-flex;align-items:center;gap:6px">&#x1F4CB; View Full Clinical Report</a></div>`:'')+
+        `</div>`;
+      addSymptoms(d.symptoms||[]);
+    },2400);
+  }catch(e){
+    document.getElementById('imgScanBar').style.display='none';
+    alert('Error: '+e.message);
+  }
+}
+
+// Run full analysis from collected symptoms
+async function runMMAnalysis(){
+  if(collected.size<2){alert('Need at least 2 symptoms.');return;}
+  const model=document.getElementById('mmModel').value;
+  document.getElementById('mmAnalyseBtn').textContent='Analysing...';
+  document.getElementById('mmAnalyseBtn').disabled=true;
+  try{
+    const r=await fetch("{% url 'predict' %}",{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+      body:JSON.stringify({symptoms:[...collected],model:model,input_mode:'multimodal'})
+    });
+    const d=await r.json();
+    document.getElementById('mmAnalyseBtn').textContent='&#x1F680; Analyse All Symptoms with AI';
+    document.getElementById('mmAnalyseBtn').disabled=false;
+    if(d.error){alert('Error: '+d.error);return;}
+    const sev_color=d.severity==='High'?'var(--danger)':d.severity==='Moderate'?'var(--warn)':'var(--accent)';
+    const action_html=d.action_level==='emergency'?
+      '<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:12px 16px;margin-top:14px;color:#991b1b;font-weight:700">EMERGENCY - Seek immediate medical care!</div>':
+      d.action_level==='see_doctor'?
+      '<div style="background:var(--warn-l);border:1px solid #fcd34d;border-radius:10px;padding:12px 16px;margin-top:14px;color:#92400e;font-weight:600">Please visit a doctor soon.</div>':
+      '<div style="background:var(--accent-l);border:1px solid #6ee7b7;border-radius:10px;padding:12px 16px;margin-top:14px;color:#065f46;font-weight:600">Home care recommended. Monitor closely.</div>';
+    document.getElementById('mmResult').style.display='block';
+    document.getElementById('mmResult').innerHTML=`
+      <div class="card" style="border-top:4px solid var(--primary)">
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px">AI PREDICTION - Multimodal Analysis</div>
+        <h2 style="font-size:1.8rem;color:var(--text)">${d.disease}</h2>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <span class="badge badge-primary">Confidence: ${d.confidence}%</span>
+          <span style="background:${sev_color}20;color:${sev_color};padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700">${d.severity} Severity</span>
+          <span class="badge badge-purple">Model: ${d.model_used}</span>
+        </div>
+        <div style="height:8px;background:var(--border);border-radius:999px;overflow:hidden;margin-top:12px">
+          <div style="height:100%;width:${d.confidence}%;background:var(--primary);border-radius:999px;transition:width .8s"></div>
+        </div>
+        ${action_html}
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <a href="/result/${d.check_id}/" class="btn btn-primary">&#x1F4CB; View Full Report</a>
+          <a href="/hospitals/" class="btn btn-accent">&#x1F3E5; Find Hospitals</a>
+        </div>
+      </div>`;
+  }catch(e){
+    document.getElementById('mmAnalyseBtn').textContent='&#x1F680; Analyse All Symptoms with AI';
+    document.getElementById('mmAnalyseBtn').disabled=false;
+    alert('Error: '+e.message);
+  }
+}
+</script>
+{% endblock %}

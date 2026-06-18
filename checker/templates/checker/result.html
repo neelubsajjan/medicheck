@@ -1,0 +1,244 @@
+{% extends 'checker/base.html' %}
+{% load checker_tags %}
+{% block title %}Result: {{ sc.predicted_disease }} — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .res-wrap{max-width:900px;margin:0 auto;padding:36px 24px 80px}
+  .back-link{color:var(--primary);font-weight:600;text-decoration:none;font-size:.88rem;
+             display:inline-flex;align-items:center;gap:4px;margin-bottom:18px}
+  .back-link:hover{text-decoration:underline}
+
+  .res-hero{background:linear-gradient(135deg,#2563eb,#1e3a8a);color:#fff;border-radius:20px;
+            padding:36px;margin-bottom:22px;position:relative;overflow:hidden}
+  .res-hero::after{content:'🏥';position:absolute;right:24px;bottom:-14px;font-size:6rem;opacity:.07;pointer-events:none}
+  .res-lbl{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;opacity:.7;margin-bottom:8px;font-weight:700}
+  .res-hero h1{font-size:2rem;font-weight:800}
+  .res-chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .res-chip{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
+            padding:5px 14px;border-radius:999px;font-size:.78rem;font-weight:600}
+  .conf-bar{height:9px;background:rgba(255,255,255,.2);border-radius:999px;overflow:hidden;margin-top:14px}
+  .conf-fill{height:100%;background:#fff;border-radius:999px;transition:width .8s}
+
+  /* Action alert */
+  .action-emergency{background:#fef2f2;border:1px solid #fca5a5;border-radius:12px;
+                    padding:14px 18px;color:#991b1b;font-weight:700;margin-bottom:20px;font-size:.95rem}
+  .action-doctor{background:var(--warn-l);border:1px solid #fcd34d;border-radius:12px;
+                 padding:14px 18px;color:#92400e;font-weight:600;margin-bottom:20px;font-size:.9rem}
+  .action-home{background:var(--accent-l);border:1px solid #6ee7b7;border-radius:12px;
+               padding:14px 18px;color:#065f46;font-weight:600;margin-bottom:20px;font-size:.9rem}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px}
+  .info-card{background:#fff;border-radius:16px;border:1px solid var(--border);padding:22px}
+  .info-card h3{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+                letter-spacing:.08em;margin-bottom:12px}
+  .sym-tag{display:inline-block;background:var(--primary-l);color:var(--primary);
+           padding:3px 10px;border-radius:999px;font-size:.76rem;font-weight:500;margin:2px}
+  .prec-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;
+             border-bottom:1px solid var(--bg);font-size:.88rem}
+  .prec-item:last-child{border-bottom:none}
+  .tick{color:var(--accent);font-weight:700;flex-shrink:0}
+  .home-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;
+             border-bottom:1px solid var(--bg);font-size:.88rem}
+  .home-item:last-child{border-bottom:none}
+  .home-tick{color:var(--purple);font-weight:700;flex-shrink:0}
+
+  /* Top predictions */
+  .pred-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bg)}
+  .pred-row:last-child{border-bottom:none}
+  .pred-bar-wrap{flex:1;height:7px;background:var(--border);border-radius:999px;overflow:hidden}
+  .pred-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary),#60a5fa)}
+  .pred-name{font-size:.82rem;font-weight:600;width:160px;flex-shrink:0}
+  .pred-pct{font-size:.78rem;color:var(--muted);width:42px;text-align:right;flex-shrink:0}
+
+  .action-row{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+  .disc{font-size:.76rem;color:var(--muted);font-style:italic;margin-top:16px;line-height:1.6}
+
+  @media(max-width:640px){.two-col{grid-template-columns:1fr}.res-hero h1{font-size:1.5rem}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="res-wrap" id="report-content">
+  <a href="{% url 'symptom_checker' %}" class="back-link" data-html2canvas-ignore="true">← Back to Symptom Checker</a>
+
+  <!-- Hero -->
+  <div class="res-hero">
+    <div class="res-lbl">AI Predicted Condition</div>
+    <h1>{{ sc.predicted_disease }}</h1>
+    <div class="res-chips">
+      <span class="res-chip">{{ sc.severity }} Severity</span>
+      <span class="res-chip">{{ sc.model_used }}</span>
+      <span class="res-chip">
+        {% if sc.input_mode == 'voice' %}🎤{% elif sc.input_mode == 'image' %}📸{% elif sc.input_mode == 'video' %}🎥{% elif sc.input_mode == 'multimodal' %}🧬{% else %}⌨️{% endif %}
+        {{ sc.input_mode|title }} Input
+      </span>
+      <span class="res-chip">{{ sc.created_at|date:"M d, Y H:i" }}</span>
+      {% if sc.patient_bmi %}<span class="res-chip">BMI {{ sc.patient_bmi }}</span>{% endif %}
+    </div>
+    <div style="font-size:.82rem;opacity:.8;margin-top:14px">Confidence: <strong>{{ sc.confidence }}%</strong></div>
+    <div class="conf-bar"><div class="conf-fill" style="width:{{ sc.confidence }}%"></div></div>
+  </div>
+
+  <!-- Action alert -->
+  {% if sc.action_level == 'emergency' %}
+  <div class="action-emergency">🚨 EMERGENCY — Please seek immediate medical care. Call 112 or go to the nearest emergency room now!</div>
+  {% elif sc.action_level == 'see_doctor' %}
+  <div class="action-doctor">🏥 Doctor Consultation Recommended — Please visit a healthcare provider soon for proper diagnosis and treatment.</div>
+  {% else %}
+  <div class="action-home">🏠 Home Care Recommended — Monitor your symptoms and follow the advice below. Seek care if symptoms worsen.</div>
+  {% endif %}
+
+  <!-- 2-col info -->
+  <div class="two-col">
+    <div class="info-card">
+      <h3>Symptoms Reported ({{ symptoms|length }})</h3>
+      {% for s in symptoms %}<span class="sym-tag">{{ s|sym_label }}</span>{% endfor %}
+    </div>
+    <div class="info-card">
+      <h3>Patient Profile</h3>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:6px">Age: <strong style="color:var(--text)">{{ sc.patient_age|default:"—" }}</strong></p>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:6px">Gender: <strong style="color:var(--text)">{{ sc.patient_gender|default:"—" }}</strong></p>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:6px">BMI: <strong style="color:var(--text)">{{ sc.patient_bmi|default:"—" }}</strong></p>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:6px">Confidence: <strong style="color:var(--text)">{{ sc.confidence }}%</strong></p>
+      <p style="font-size:.85rem;color:var(--muted)">Model: <strong style="color:var(--text)">{{ sc.model_used }}</strong></p>
+    </div>
+  </div>
+
+  <!-- Top predictions -->
+  {% if all_preds %}
+  <div class="info-card" style="margin-bottom:18px">
+    <h3>Top AI Predictions</h3>
+    {% for disease, pct in all_preds.items %}
+    <div class="pred-row">
+      <div class="pred-name">{{ disease }}</div>
+      <div class="pred-bar-wrap"><div class="pred-bar-fill" style="width:{{ pct }}%"></div></div>
+      <div class="pred-pct">{{ pct }}%</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Precautions + Home care -->
+  <div class="two-col">
+    <div class="info-card">
+      <h3>Recommended Precautions</h3>
+      {% for p in precautions %}
+      <div class="prec-item"><span class="tick">✓</span><span>{{ p }}</span></div>
+      {% empty %}<p style="color:var(--muted);font-size:.88rem">Consult a healthcare professional.</p>
+      {% endfor %}
+    </div>
+    <div class="info-card">
+      <h3>🏠 Home Care Advice</h3>
+      {% for h in home_care %}
+      <div class="home-item"><span class="home-tick">💊</span><span>{{ h }}</span></div>
+      {% empty %}<p style="color:var(--muted);font-size:.88rem">Rest and monitor symptoms closely.</p>
+      {% endfor %}
+    </div>
+  </div>
+  
+  {% if medications %}
+  <div class="info-card" style="margin-bottom: 20px;">
+    <h3>💊 Suggested OTC Medications</h3>
+    {% for m in medications %}
+    <div class="prec-item"><span class="tick" style="color:var(--primary)">+</span><span>{{ m }}</span></div>
+    {% endfor %}
+    <p style="font-size: 0.75rem; color: var(--muted); margin-top: 10px; font-style: italic;">
+      Note: These are general suggestions. Do not take any medication without consulting a pharmacist or doctor.
+    </p>
+  </div>
+  {% endif %}
+
+  <!-- Personalized Diet & Wellness Advisor -->
+  {% if wellness_advice %}
+  <div class="info-card" style="margin-bottom: 20px; border-left: 5px solid var(--primary); background: #f9fafb; padding: 24px;">
+    <h3 style="color: var(--primary-dark); font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+      🥗 Personalized Diet & Wellness Advisor
+    </h3>
+    <p style="font-size: 0.82rem; color: var(--muted); margin-bottom: 20px;">
+      Based on your predicted condition (<strong>{{ sc.predicted_disease }}</strong>), age, and BMI.
+    </p>
+    
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+      <!-- Diet column -->
+      <div style="background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
+        <h4 style="font-size: 0.82rem; font-weight: 700; color: #047857; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          🟢 Recommended Foods & Diet
+        </h4>
+        <ul style="list-style: none; padding-left: 0; margin-bottom: 16px;">
+          {% for d in wellness_advice.diet %}
+          <li style="font-size: 0.82rem; margin-bottom: 8px; padding-left: 14px; position: relative; color: var(--text);">
+            <span style="position: absolute; left: 0; color: #10b981;">•</span> {{ d }}
+          </li>
+          {% endfor %}
+        </ul>
+        
+        <h4 style="font-size: 0.82rem; font-weight: 700; color: #b91c1c; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          🔴 Foods to Avoid
+        </h4>
+        <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+          {% for af in wellness_advice.avoid_foods %}
+          <li style="font-size: 0.82rem; margin-bottom: 8px; padding-left: 14px; position: relative; color: var(--text);">
+            <span style="position: absolute; left: 0; color: #f87171;">•</span> {{ af }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Exercise & Activity column -->
+      <div style="background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
+        <h4 style="font-size: 0.82rem; font-weight: 700; color: #0369a1; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          🏃‍♂️ Exercises to Practice
+        </h4>
+        <ul style="list-style: none; padding-left: 0; margin-bottom: 16px;">
+          {% for ex in wellness_advice.exercise %}
+          <li style="font-size: 0.82rem; margin-bottom: 8px; padding-left: 14px; position: relative; color: var(--text);">
+            <span style="position: absolute; left: 0; color: #38bdf8;">•</span> {{ ex }}
+          </li>
+          {% endfor %}
+        </ul>
+        
+        <h4 style="font-size: 0.82rem; font-weight: 700; color: #d97706; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          ⚠️ Activities to Avoid
+        </h4>
+        <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+          {% for aa in wellness_advice.avoid_activities %}
+          <li style="font-size: 0.82rem; margin-bottom: 8px; padding-left: 14px; position: relative; color: var(--text);">
+            <span style="position: absolute; left: 0; color: #fbbf24;">•</span> {{ aa }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="action-row">
+    {% if user.is_authenticated %}
+      <a href="{% url 'request_consultation' sc.id %}" class="btn btn-primary">📅 Request Consultation</a>
+    {% else %}
+      <a href="{% url 'login' %}" class="btn btn-primary">Login to Request Consultation</a>
+    {% endif %}
+    <a href="{% url 'hospitals' %}" class="btn btn-accent" data-html2canvas-ignore="true">🏥 Find Hospitals</a>
+    <a href="{% url 'chatbot' %}" class="btn btn-outline" data-html2canvas-ignore="true">💬 Ask AI Assistant</a>
+    <a href="{% url 'result_print' sc.id %}" target="_blank" class="btn btn-outline" style="border-color:#10b981; color:#047857; font-weight:700;" data-html2canvas-ignore="true">
+      📄 Export Clinical Report (PDF)
+    </a>
+  </div>
+
+  <p class="disc">⚠️ This AI assessment is for pre-screening and educational purposes only. It does not constitute a medical diagnosis. Always consult a qualified healthcare professional before making health decisions.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+  function downloadPDF() {
+    const element = document.getElementById('report-content');
+    const opt = {
+      margin:       [0.5, 0.5, 0.5, 0.5],
+      filename:     'MediAI_Diagnosis_Report_{{ sc.created_at|date:"Ymd" }}.pdf',
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+  }
+</script>
+{% endblock %}

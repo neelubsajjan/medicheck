@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MediAI Clinical Report - #{{ sc.id }}</title>
+  <style>
+    :root {
+      --primary: #10b981;
+      --primary-dark: #059669;
+      --text: #1f2937;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+      --bg-light: #f9fafb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      color: var(--text);
+      line-height: 1.5;
+      padding: 40px;
+      background: #fff;
+    }
+    .prescription-sheet {
+      max-width: 800px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      padding: 40px;
+      position: relative;
+    }
+    .letterhead {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      font-size: 2.2rem;
+    }
+    .logo-text h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+      letter-spacing: -0.03em;
+    }
+    .logo-text p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .doctor-meta {
+      text-align: right;
+    }
+    .doctor-meta h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .doctor-meta p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .patient-block {
+      background: var(--bg-light);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      font-size: 0.85rem;
+    }
+    .patient-meta-item strong {
+      color: var(--text-muted);
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+    .section-title {
+      font-size: 1rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary-dark);
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .diagnosis-header {
+      margin-bottom: 24px;
+    }
+    .diagnosis-badge {
+      display: inline-block;
+      background: #e6fffa;
+      color: var(--primary-dark);
+      font-size: 1.3rem;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #b2f5ea;
+      margin-top: 4px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    .bullet-list {
+      list-style: none;
+    }
+    .bullet-list li {
+      position: relative;
+      padding-left: 18px;
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+      color: #374151;
+    }
+    .bullet-list li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--primary);
+      font-weight: bold;
+    }
+    .wellness-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+    .wellness-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .wellness-card.positive {
+      border-left: 4px solid var(--primary);
+    }
+    .wellness-card.negative {
+      border-left: 4px solid #ef4444;
+    }
+    .wellness-card h4 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .footer-block {
+      margin-top: 40px;
+      border-top: 1px dashed var(--border);
+      padding-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .footer-stamp {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .signature {
+      text-align: right;
+    }
+    .signature-graphic {
+      font-family: 'Brush Script MT', cursive, sans-serif;
+      font-size: 1.8rem;
+      color: #3b82f6;
+      margin-bottom: 4px;
+    }
+    .signature-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--text-muted);
+      padding-top: 4px;
+      width: 160px;
+      text-align: center;
+    }
+    @media print {
+      body { padding: 0; }
+      .prescription-sheet { border: none; padding: 0; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="prescription-sheet">
+    <!-- Letterhead -->
+    <div class="letterhead">
+      <div class="logo">
+        <span class="logo-icon">❇️</span>
+        <div class="logo-text">
+          <h1>MediAI Clinical Report</h1>
+          <p>Autonomous AI Diagnostic Service</p>
+        </div>
+      </div>
+      <div class="doctor-meta">
+        <h3>Dr. MediAI, MD</h3>
+        <p>Chief AI Diagnostic Engine</p>
+        <p>License: #A1-987654</p>
+      </div>
+    </div>
+
+    <!-- Patient Details -->
+    <div class="patient-block">
+      <div class="patient-meta-item">
+        <strong>Patient Name</strong>
+        {{ sc.user.get_full_name|default:sc.user.username }}
+      </div>
+      <div class="patient-meta-item">
+        <strong>Age / Gender</strong>
+        {{ sc.patient_age|default:"N/A" }} Yrs / {{ sc.patient_gender|default:"N/A"|title }}
+      </div>
+      <div class="patient-meta-item">
+        <strong>Report ID</strong>
+        #MD-{{ sc.id }}
+      </div>
+      <div class="patient-meta-item">
+        <strong>Date & Time</strong>
+        {{ sc.created_at|date:"Y-m-d H:i" }}
+      </div>
+    </div>
+
+    <!-- Main Prediction -->
+    <div class="diagnosis-header">
+      <div class="section-title">Clinical Diagnosis Result</div>
+      <div class="diagnosis-badge">{{ sc.predicted_disease }}</div>
+      <p style="font-size: 0.85rem; margin-top: 6px; color: var(--text-muted);">
+        Confidence: <strong>{{ sc.confidence|floatformat:1 }}%</strong> | Severity: <strong>{{ sc.severity }}</strong> | Action: <strong>{{ sc.action_level|title }}</strong>
+      </p>
+    </div>
+
+    <div class="meta-grid">
+      <!-- Precautions -->
+      <div>
+        <div class="section-title">Precautions & Safety Protocols</div>
+        <ul class="bullet-list">
+          {% for p in precautions %}
+          <li>{{ p }}</li>
+          {% empty %}
+          <li>Maintain general health hygiene. Consult a practitioner if symptoms worsen.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      
+      <!-- Home care -->
+      <div>
+        <div class="section-title">Home Care Guidelines</div>
+        <ul class="bullet-list">
+          {% for hc in home_care %}
+          <li>{{ hc }}</li>
+          {% empty %}
+          <li>Prioritize bed rest and keep highly hydrated.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Dynamic Diet and Wellness Advisor Plan -->
+    <div class="section-title">🥗 Personalized Diet & Wellness Advisor</div>
+    <div class="wellness-grid">
+      <div class="wellness-card positive">
+        <h4>🟢 Recommended Foods & Diet</h4>
+        <ul class="bullet-list">
+          {% for d in wellness_advice.diet %}
+          <li>{{ d }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="wellness-card negative">
+        <h4>🔴 Foods to Avoid</h4>
+        <ul class="bullet-list">
+          {% for af in wellness_advice.avoid_foods %}
+          <li>{{ af }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="wellness-card positive" style="margin-top: 10px;">
+        <h4>🏃‍♂️ Exercises to Practice</h4>
+        <ul class="bullet-list">
+          {% for ex in wellness_advice.exercise %}
+          <li>{{ ex }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="wellness-card negative" style="margin-top: 10px;">
+        <h4>⚠️ Activities to Avoid</h4>
+        <ul class="bullet-list">
+          {% for aa in wellness_advice.avoid_activities %}
+          <li>{{ aa }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer block -->
+    <div class="footer-block">
+      <div class="footer-stamp">
+        <p>✓ Diagnostic Model: {{ sc.model_used }} Classifier</p>
+        <p>✓ Certified under ISO-27001 AI Standards.</p>
+        <p style="margin-top: 4px; font-weight: 700; color: #ef4444;">DISCLAIMER: AI-generated guidance. Verify with a registered medical practitioner.</p>
+      </div>
+      <div class="signature">
+        <div class="signature-graphic">Dr. MediAI</div>
+        <div class="signature-title">Authorized Diagnostic Stamp</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      // Trigger native print flow immediately
+      setTimeout(() => {
+        window.print();
+      }, 500);
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,999 @@
+{% extends 'checker/base.html' %}
+{% block title %}Dashboard — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .dash-wrap{max-width:1200px;margin:0 auto;padding:32px 24px 80px}
+  .dash-header{margin-bottom:26px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px}
+  .dash-header h1{font-size:1.7rem;font-weight:800}
+  .dash-header p{color:var(--muted);margin-top:3px;font-size:.9rem}
+
+  /* Profile card */
+  .profile-banner{background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;border-radius:18px;
+                  padding:24px 28px;margin-bottom:24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .p-avatar{width:60px;height:60px;background:rgba(255,255,255,.2);border-radius:50%;
+            display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0}
+  .p-info h3{font-size:1.2rem;font-weight:800}
+  .p-info p{opacity:.82;font-size:.85rem;margin-top:3px}
+  .p-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .p-chip{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:999px;
+          padding:4px 12px;font-size:.76rem;font-weight:600}
+  .p-chip.bmi-ok{background:rgba(16,185,129,.3);border-color:rgba(16,185,129,.5)}
+  .p-chip.bmi-warn{background:rgba(245,158,11,.3);border-color:rgba(245,158,11,.5)}
+  .p-chip.bmi-bad{background:rgba(239,68,68,.3);border-color:rgba(239,68,68,.5)}
+
+  /* Stat row */
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+  .stat-card{background:#fff;border-radius:14px;border:1px solid var(--border);padding:18px 20px;
+             display:flex;align-items:center;gap:14px}
+  .stat-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0}
+  .stat-val{font-size:1.7rem;font-weight:800;line-height:1}
+  .stat-lbl{font-size:.74rem;color:var(--muted);font-weight:500;margin-top:3px}
+
+  /* Quick actions */
+  .quick-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+  .quick-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 10px;
+             background:#fff;border-radius:14px;border:1px solid var(--border);text-decoration:none;
+             color:var(--text);transition:all .2s;font-size:.78rem;font-weight:600;text-align:center}
+  .quick-btn:hover{border-color:var(--primary);background:var(--primary-l);color:var(--primary);transform:translateY(-2px)}
+  .quick-btn .q-icon{font-size:1.5rem}
+
+  /* Table */
+  .sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .sec-hdr h3{font-size:1rem;font-weight:700}
+  .htable{width:100%;border-collapse:collapse}
+  .htable th{text-align:left;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+             color:var(--muted);padding:9px 13px;border-bottom:2px solid var(--border);background:var(--bg)}
+  .htable td{padding:11px 13px;border-bottom:1px solid var(--border);font-size:.86rem}
+  .htable tr:last-child td{border-bottom:none}
+  .htable tr:hover td{background:#fafbff}
+  .tlink{color:var(--primary);font-weight:600;text-decoration:none;font-size:.8rem}
+  .tlink:hover{text-decoration:underline}
+  .mode-ico{font-size:.95rem}
+
+  /* Consult */
+  .consult-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;
+               border-bottom:1px solid var(--border)}
+  .consult-row:last-child{border-bottom:none}
+  .del-btn{background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:7px;
+           color:var(--muted);transition:all .18s;font-size:.8rem;display:flex;align-items:center;gap:4px}
+  .del-btn:hover{background:var(--danger-l);color:var(--danger)}
+  .del-btn svg{width:14px;height:14px}
+
+  @media(max-width:900px){.stat-row,.quick-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:600px){.stat-row{grid-template-columns:1fr 1fr}.quick-grid{grid-template-columns:repeat(3,1fr)}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="dash-wrap">
+
+  <div class="dash-header">
+    <div>
+      <h1>Welcome back, {{ user.first_name|default:user.username }} 👋</h1>
+      <p>Your AI health dashboard — personalised insights and history.</p>
+    </div>
+    <a href="{% url 'edit_profile' %}" class="btn btn-outline btn-sm">✏️ Edit Profile</a>
+  </div>
+
+  <!-- Profile Banner -->
+  <div class="profile-banner">
+    <div class="p-avatar">👤</div>
+    <div class="p-info">
+      <h3>{% if is_doctor %}Dr. {% endif %}{{ user.get_full_name|default:user.username }}</h3>
+      <p>{{ user.email }}</p>
+      <div class="p-chips">
+        {% if is_doctor %}
+          <span class="p-chip">🩺 {{ profile.specialization }}</span>
+          {% if profile.experience_years %}<span class="p-chip">{{ profile.experience_years }} years exp</span>{% endif %}
+          <span class="p-chip">🏥 {{ profile.hospital }}</span>
+        {% else %}
+          {% if profile %}
+            {% if profile.age %}<span class="p-chip">{{ profile.age }} years</span>{% endif %}
+            {% if profile.gender %}<span class="p-chip">{{ profile.gender }}</span>{% endif %}
+            {% if profile.bmi %}
+              <span class="p-chip {% if profile.bmi_category == 'Normal' %}bmi-ok{% elif profile.bmi_category == 'Underweight' %}bmi-warn{% else %}bmi-bad{% endif %}">
+                BMI {{ profile.bmi }} — {{ profile.bmi_category }}
+              </span>
+            {% else %}
+              <span class="p-chip bmi-warn" style="cursor:pointer" onclick="window.location='{% url 'edit_profile' %}'">⚠️ Add height & weight for BMI</span>
+            {% endif %}
+            {% if profile.location %}<span class="p-chip">📍 {{ profile.location }}</span>{% endif %}
+          {% else %}
+            <span class="p-chip bmi-warn">⚠️ Complete your profile for personalised diagnosis</span>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#eff6ff">🔍</div>
+      <div><div class="stat-val">{{ history|length }}</div><div class="stat-lbl">Symptom Checks</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#ecfdf5">📅</div>
+      <div><div class="stat-val">{{ consultations|length }}</div><div class="stat-lbl">Consultations</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#f5f3ff">🤖</div>
+      <div><div class="stat-val">6</div><div class="stat-lbl">AI Models</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#fffbeb">🏥</div>
+      <div><div class="stat-val">41</div><div class="stat-lbl">Diseases Covered</div></div>
+    </div>
+  </div>
+
+  {% if not is_doctor %}
+  <!-- Personalized Insights -->
+  <div class="card" style="margin-bottom:24px; background: linear-gradient(135deg, #fff, #f8fafc); border-left: 4px solid var(--accent);">
+    <div class="sec-hdr" style="margin-bottom: 8px;">
+      <h3 style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 1.2rem;">💡</span> Daily Health Insights</h3>
+    </div>
+    <div style="font-size: 0.9rem; color: var(--text);">
+      {% if profile.bmi %}
+        {% if profile.bmi_category == 'Obese' %}
+          <p style="margin-bottom: 6px;"><strong>Health Tip:</strong> Your BMI indicates you are in the Obese category. Consider starting a light daily walking routine and consulting a nutritionist to build a sustainable meal plan.</p>
+        {% elif profile.bmi_category == 'Overweight' %}
+          <p style="margin-bottom: 6px;"><strong>Health Tip:</strong> Your BMI indicates you are Overweight. Incorporating 30 minutes of moderate exercise and reducing processed sugars can significantly improve your long-term health.</p>
+        {% elif profile.bmi_category == 'Underweight' %}
+          <p style="margin-bottom: 6px;"><strong>Health Tip:</strong> Your BMI indicates you are Underweight. Focus on nutrient-dense foods like nuts, avocados, and proteins to build healthy muscle mass.</p>
+        {% else %}
+          <p style="margin-bottom: 6px;"><strong>Health Tip:</strong> Great job maintaining a Normal BMI! Keep up your balanced diet and regular physical activity.</p>
+        {% endif %}
+      {% else %}
+        <p style="margin-bottom: 6px;"><strong>Health Tip:</strong> Update your profile with your height and weight to receive personalized BMI health insights.</p>
+      {% endif %}
+      
+      {% if history %}
+        {% with latest=history.0 %}
+          <p><strong>Recent Diagnosis Note:</strong> Your last check indicated <strong>{{ latest.predicted_disease }}</strong>. If symptoms persist or worsen, please use the <a href="{% url 'hospitals' %}" style="color:var(--primary); font-weight: 600;">Hospital Finder</a> or request a doctor consultation.</p>
+        {% endwith %}
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="quick-grid">
+    <a href="{% url 'symptom_checker' %}" class="quick-btn"><span class="q-icon">⌨️</span>Symptom Check</a>
+    <a href="{% url 'multimodal' %}" class="quick-btn"><span class="q-icon">🧬</span>Multimodal</a>
+    <a href="{% url 'chatbot' %}" class="quick-btn"><span class="q-icon">💬</span>AI Chatbot</a>
+    <a href="{% url 'hospitals' %}" class="quick-btn"><span class="q-icon">🏥</span>Hospitals</a>
+    <a href="{% url 'history' %}" class="quick-btn"><span class="q-icon">📋</span>History</a>
+  </div>
+  {% endif %}
+
+  {% if not is_doctor %}
+  <!-- Preventative Health & Lifestyle Recommendations Guide -->
+  <div class="card" style="margin-bottom: 24px; border: 1px solid rgba(16, 185, 129, 0.2); background: linear-gradient(135deg, #fff, #f6fdf9);">
+    <div class="sec-hdr" style="border-bottom: 1.5px solid rgba(16, 185, 129, 0.1); padding-bottom: 12px; margin-bottom: 18px;">
+      <h3 style="color: #047857; display: flex; align-items: center; gap: 8px; font-size: 1.2rem;">
+        <span>🌿</span> MediAI Good Health & Lifestyle Recommendations
+      </h3>
+      <span class="badge badge-success">Wellness Guide</span>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <div style="font-size: 1.8rem; background: #e6f7f0; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #10b981;">💧</div>
+        <div>
+          <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; color: var(--text);">Hydration Target</h4>
+          <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.5;">Aim for 3 to 3.5 liters of clean water daily to optimize cardiovascular health, cognitive focus, and kidney filtration.</p>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <div style="font-size: 1.8rem; background: #e0f2fe; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #0284c7;">🏃‍♂️</div>
+        <div>
+          <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; color: var(--text);">Physical Activity</h4>
+          <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.5;">Incorporate 150+ minutes of moderate-intensity aerobic exercise (like brisk walking or cycling) weekly, paired with light strength training.</p>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <div style="font-size: 1.8rem; background: #fef3c7; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #d97706;">🥗</div>
+        <div>
+          <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; color: var(--text);">Nutrition & Diet Plan</h4>
+          <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.5;">
+            {% if profile.bmi %}
+              {% if profile.bmi_category == 'Obese' or profile.bmi_category == 'Overweight' %}
+                <strong>Calorie Deficit focus:</strong> Shift towards high-fiber foods, lean proteins (fish, egg whites, beans), and eliminate high-calorie sugary soft drinks and processed fats.
+              {% elif profile.bmi_category == 'Underweight' %}
+                <strong>Caloric Surplus focus:</strong> Consume healthy high-density calorie sources like nuts, avocados, olive oil, milk, and whole grains to facilitate healthy muscle mass growth.
+              {% else %}
+                <strong>Balanced Diet focus:</strong> Maintain balanced portions of lean protein, healthy complex carbs (quinoa, oats), and fill half of your plate with colored greens.
+              {% endif %}
+            {% else %}
+              Maintain a diet filled with high-fiber whole foods, healthy proteins, and clean fats. <a href="{% url 'edit_profile' %}" style="color:var(--primary); font-weight:600">Add measurements</a> for custom insights!
+            {% endif %}
+          </p>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <div style="font-size: 1.8rem; background: #f5f3ff; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #7c3aed;">😴</div>
+        <div>
+          <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; color: var(--text);">Sleep & Recovery</h4>
+          <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.5;">Secure 7 to 8 hours of deep night sleep. Consistent sleep cycles boost standard cell regeneration, emotional stability, and overall immune resistance.</p>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 14px; align-items: flex-start;">
+        <div style="font-size: 1.8rem; background: #fdf2f8; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #db2777;">🩺</div>
+        <div>
+          <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; color: var(--text);">Preventative Screenings</h4>
+          <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.5;">Take proactive control. Check blood pressure, blood glucose, and lipids annually. Detect anomalies early to guarantee long-term health stability.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drug Interaction Checker Card -->
+  <div class="card" style="margin-bottom: 24px;">
+    <div class="sec-hdr" style="margin-bottom: 12px;">
+      <h3 style="color: #4f46e5; display: flex; align-items: center; gap: 8px; font-size: 1.2rem;">
+        🧪 MediAI Drug Interaction Checker
+      </h3>
+      <span class="badge badge-primary">Safety Tool</span>
+    </div>
+    <p style="font-size:0.8rem; color:var(--muted); margin-bottom:12px;">
+      Type two medications below to verify if they have any known adverse clinical interactions (e.g. Aspirin and Warfarin).
+    </p>
+    <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
+      <input type="text" id="drug1" class="form-control" placeholder="Medication 1 (e.g. Aspirin)" style="flex: 1; min-width: 150px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+      <input type="text" id="drug2" class="form-control" placeholder="Medication 2 (e.g. Warfarin)" style="flex: 1; min-width: 150px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+      <button onclick="checkDrugInteractions()" class="btn btn-primary" style="padding: 8px 16px;">Check Interactions</button>
+    </div>
+    <div id="interaction-result" style="display: none; padding: 12px 16px; border-radius: 8px; font-size: 0.88rem; line-height: 1.5; font-weight: 500;"></div>
+  </div>
+  {% endif %}
+
+  {% if not is_doctor %}
+  <!-- Interactive Vitals Tracker & Pill Reminders Grid Layout -->
+  <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 24px; margin-bottom: 24px;">
+    
+    <!-- VITALS TRACKER -->
+    <div class="card" style="padding: 24px; display: flex; flex-direction: column;">
+      <div class="sec-hdr" style="margin-bottom: 16px;">
+        <h3 style="color: #2563eb; display: flex; align-items: center; gap: 8px; font-size: 1.2rem;">
+          📈 Interactive Vitals & Health Tracker
+        </h3>
+        <button onclick="document.getElementById('vitals-modal').style.display='flex'" class="btn btn-primary btn-sm">
+          + Log Vitals
+        </button>
+      </div>
+
+      <!-- Trend Filter Controls -->
+      <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+        <button onclick="switchVitalsChart('bp')" id="btn-chart-bp" class="btn btn-sm btn-primary">BP & Heart Rate</button>
+        <button onclick="switchVitalsChart('glucose')" id="btn-chart-glucose" class="btn btn-sm btn-outline">Blood Glucose</button>
+        <button onclick="switchVitalsChart('wellness')" id="btn-chart-wellness" class="btn btn-sm btn-outline">Sleep & Hydration</button>
+      </div>
+
+      <!-- Vitals Chart Canvas -->
+      <div style="flex-grow: 1; min-height: 220px; position: relative; margin-bottom: 14px;">
+        <canvas id="vitalsTrendChart"></canvas>
+      </div>
+
+      <!-- Vitals Log History (Mini Table) -->
+      <div style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+        <table class="htable" style="font-size: 0.8rem; margin: 0; width: 100%;">
+          <thead>
+            <tr>
+              <th style="padding: 6px 10px;">BP (mmHg)</th>
+              <th style="padding: 6px 10px;">Pulse</th>
+              <th style="padding: 6px 10px;">Temp</th>
+              <th style="padding: 6px 10px;">Glucose</th>
+              <th style="padding: 6px 10px;">Sleep</th>
+              <th style="padding: 6px 10px;">Water</th>
+              <th style="padding: 6px 10px;">Logged</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in vitals_logs %}
+            <tr>
+              <td style="padding: 8px 10px;"><strong>{{ log.systolic }}/{{ log.diastolic }}</strong></td>
+              <td style="padding: 8px 10px;">{{ log.heart_rate }} bpm</td>
+              <td style="padding: 8px 10px;">{{ log.temperature }}°F</td>
+              <td style="padding: 8px 10px;">{{ log.blood_glucose }} mg/dL</td>
+              <td style="padding: 8px 10px;">{{ log.sleep_hours }} hrs</td>
+              <td style="padding: 8px 10px;">{{ log.hydration_ml }} ml</td>
+              <td style="padding: 8px 10px; color: var(--muted);">{{ log.timestamp|date:"M d, H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--muted); padding: 20px;">No vitals logged yet. Log your first daily entry above!</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MEDICATION PILL REMINDER -->
+    <div class="card" style="padding: 24px; display: flex; flex-direction: column;">
+      <div class="sec-hdr" style="margin-bottom: 16px;">
+        <h3 style="color: #db2777; display: flex; align-items: center; gap: 8px; font-size: 1.2rem;">
+          💊 Pill Tracker & Reminders
+        </h3>
+        <button onclick="document.getElementById('med-modal').style.display='flex'" class="btn btn-accent btn-sm">
+          + Add Pill
+        </button>
+      </div>
+
+      <!-- Pill Reminder Calendar/List -->
+      <div style="flex-grow: 1; max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;" id="medications-list-container">
+        {% for med in medications %}
+        <div style="background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; align-items: center; justify-content: space-between; border-left: 4px solid {% if med.active %}#db2777{% else %}#9ca3af{% endif %}; opacity: {% if med.active %}1{% else %}0.6{% endif %};">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-size: 1.6rem;">{% if med.active %}💊{% else %}⚪{% endif %}</div>
+            <div>
+              <strong style="font-size: 0.9rem; text-decoration: {% if not med.active %}line-through{% else %}none{% endif %};">{{ med.name }}</strong>
+              <div style="font-size: 0.78rem; color: var(--muted); margin-top: 2px;">
+                Dosage: <strong>{{ med.dosage }}</strong> | Frequency: <strong>{{ med.frequency }}</strong>
+              </div>
+              <div style="display: inline-block; background: #fdf2f8; color: #db2777; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-top: 4px;">
+                ⏰ {{ med.time|time:"H:i" }}
+              </div>
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 8px;">
+            <!-- Toggle Active -->
+            <button onclick="toggleMedication({{ med.id }})" class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size: 0.75rem;">
+              {% if med.active %}Mute{% else %}Activate{% endif %}
+            </button>
+            <!-- Delete -->
+            <button onclick="deleteMedication({{ med.id }})" class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size: 0.75rem; border-color: #ef4444; color: #ef4444;">
+              Delete
+            </button>
+          </div>
+        </div>
+        {% empty %}
+        <div style="text-align: center; color: var(--muted); padding: 40px; margin: auto 0;">
+          <div style="font-size: 2.2rem; margin-bottom: 8px;">🔔</div>
+          <p style="font-size: 0.85rem;">No active medication reminders configured.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODALS FOR VITALS LOGGING AND MEDICATION ADDING -->
+  <!-- Vitals Modal -->
+  <div id="vitals-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; padding: 20px;">
+    <div style="background: #fff; border-radius: 16px; max-width: 500px; width: 100%; padding: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
+      <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text); margin-bottom: 16px;">📈 Record Daily Health Vitals</h3>
+      <form id="vitals-form" onsubmit="submitVitals(event)">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+          <div>
+            <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">BP Systolic (mmHg)</label>
+            <input type="number" name="systolic" required value="120" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">BP Diastolic (mmHg)</label>
+            <input type="number" name="diastolic" required value="80" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Heart Rate (bpm)</label>
+            <input type="number" name="heart_rate" required value="72" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Body Temp (°F)</label>
+            <input type="number" step="0.1" name="temperature" required value="98.6" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Blood Glucose (mg/dL)</label>
+            <input type="number" name="blood_glucose" required value="100" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Sleep (Hours)</label>
+            <input type="number" step="0.5" name="sleep_hours" required value="8.0" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+          </div>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Hydration (ml)</label>
+          <input type="number" name="hydration_ml" required value="2000" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" onclick="document.getElementById('vitals-modal').style.display='none'" class="btn btn-outline btn-sm">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Entry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Medication Modal -->
+  <div id="med-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; padding: 20px;">
+    <div style="background: #fff; border-radius: 16px; max-width: 450px; width: 100%; padding: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
+      <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text); margin-bottom: 16px;">💊 Schedule Medication Reminder</h3>
+      <form id="med-form" onsubmit="submitMedication(event)">
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Pill / Medicine Name</label>
+          <input type="text" name="name" required placeholder="e.g. Metformin" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+        </div>
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Dosage</label>
+          <input type="text" name="dosage" required placeholder="e.g. 500mg (1 tablet)" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+        </div>
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Frequency</label>
+          <input type="text" name="frequency" required value="Daily (with lunch)" placeholder="e.g. Once daily" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+        </div>
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Schedule Time</label>
+          <input type="time" name="time" required value="08:00" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" onclick="document.getElementById('med-modal').style.display='none'" class="btn btn-outline btn-sm">Cancel</button>
+          <button type="submit" class="btn btn-accent btn-sm">Add Reminder</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not is_doctor %}
+  <!-- Layout for Chart and Recent Checks -->
+  <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom:22px;">
+    
+    <!-- Chart Card -->
+    <div class="card" style="display: flex; flex-direction: column;">
+      <div class="sec-hdr">
+        <h3>Severity Trends</h3>
+      </div>
+      <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; position: relative;">
+        <canvas id="severityChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Recent checks -->
+    <div class="card">
+      <div class="sec-hdr">
+        <h3>Recent Symptom Checks</h3>
+        <a href="{% url 'symptom_checker' %}" class="btn btn-primary btn-sm">+ New Check</a>
+      </div>
+    {% if history %}
+    <div style="overflow-x:auto">
+      <table class="htable">
+        <thead><tr>
+          <th>Mode</th><th>Condition</th><th>Confidence</th>
+          <th>Severity</th><th>Action</th><th>Date</th><th></th>
+        </tr></thead>
+        <tbody>
+          {% for sc in history %}
+          <tr>
+            <td><span class="mode-ico">
+              {% if sc.input_mode == 'voice' %}🎤{% elif sc.input_mode == 'image' %}📸{% elif sc.input_mode == 'video' %}🎥{% elif sc.input_mode == 'multimodal' %}🧬{% else %}⌨️{% endif %}
+            </span></td>
+            <td><strong>{{ sc.predicted_disease }}</strong></td>
+            <td>{{ sc.confidence }}%</td>
+            <td><span class="badge {% if sc.severity == 'High' %}badge-danger{% elif sc.severity == 'Moderate' %}badge-warn{% else %}badge-success{% endif %}">{{ sc.severity }}</span></td>
+            <td><span class="badge {% if sc.action_level == 'emergency' %}badge-danger{% elif sc.action_level == 'see_doctor' %}badge-warn{% else %}badge-success{% endif %}">
+              {% if sc.action_level == 'emergency' %}🚨 Emergency{% elif sc.action_level == 'see_doctor' %}🏥 See Doctor{% else %}🏠 Home Care{% endif %}
+            </span></td>
+            <td style="color:var(--muted)">{{ sc.created_at|date:"M d, Y" }}</td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <a href="{% url 'result' sc.id %}" class="tlink">View →</a>
+                <a href="{% url 'request_consultation' sc.id %}" class="tlink" style="color:var(--accent)">Consult</a>
+                <form method="post" action="{% url 'delete_history' sc.id %}" onsubmit="return confirm('Delete this record?')" style="margin:0; display: inline;">
+                  {% csrf_token %}
+                  <button type="submit" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1.1rem;padding:0 5px;" title="Delete">🗑️</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="color:var(--muted);padding:10px 0;">No checks yet. <a href="{% url 'symptom_checker' %}" style="color:var(--primary)">Start one</a>.</p>
+    {% endif %}
+    </div> <!-- End Recent Checks card -->
+  </div> <!-- End Grid layout -->
+  {% endif %}
+
+  <!-- Consultations -->
+  <div class="card">
+    <div class="sec-hdr">
+      <h3>Consultation Requests</h3>
+      {% if not is_doctor %}
+        <button onclick="document.getElementById('booking-modal').style.display='flex'" class="btn btn-primary btn-sm">📅 Schedule Consultation</button>
+      {% endif %}
+    </div>
+    {% if consultations %}
+      {% for c in consultations %}
+      <div class="consult-row">
+        <div>
+          <strong>{% if is_doctor %}Patient: {{ c.patient.get_full_name|default:c.patient.username }}{% else %}{{ c.symptom_check.predicted_disease|default:"General Consultation" }}{% endif %}</strong>
+          <div style="font-size:.78rem;color:var(--muted);margin-top:2px">
+            {% if not is_doctor %}Doctor: {{ c.doctor|default:"Pending Assignment" }} | {% endif %}{{ c.created_at|date:"M d, Y · H:i" }}
+            {% if c.scheduled_time %}<br><span style="color:var(--primary);font-weight:600">📅 Scheduled: {{ c.scheduled_time|date:"M d, Y · H:i" }}</span>{% endif %}
+            {% if is_doctor and c.symptom_check %}<br><a href="{% url 'result' c.symptom_check.id %}" style="color:var(--primary)">View Patient Report</a>{% endif %}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="badge {% if c.status == 'Approved' %}badge-success{% elif c.status == 'Completed' %}badge-primary{% else %}badge-warn{% endif %}">
+            {{ c.status }}
+          </span>
+          
+          {% if is_doctor and c.status == 'Pending' %}
+          <form method="post" action="{% url 'approve_consultation' c.id %}" style="margin:0;display:flex;gap:8px">
+            {% csrf_token %}
+            <input type="datetime-local" name="scheduled_time" required class="form-control" style="padding:4px 8px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border)">
+            <button type="submit" class="btn btn-sm btn-primary" style="padding:6px 12px;font-size:0.75rem">Approve</button>
+          </form>
+          {% endif %}
+
+          {% if c.meet_link and c.status == 'Approved' %}
+          <a href="{% url 'video_consultation' c.id %}" class="btn btn-sm btn-accent" style="padding:6px 12px;font-size:0.75rem;background:#8b5cf6;color:#fff;text-decoration:none">🎥 Join Call</a>
+          {% endif %}
+
+          {% if is_doctor and c.status == 'Approved' %}
+          <a href="{% url 'write_prescription' c.id %}" class="btn btn-sm btn-accent" style="padding:6px 12px;font-size:0.75rem;background:#10b981;color:#fff;text-decoration:none">✍️ Write Prescription</a>
+          {% endif %}
+
+          {% if c.status == 'Completed' %}
+          <a href="{% url 'view_prescription' c.id %}" class="btn btn-sm btn-outline" style="padding:6px 12px;font-size:0.75rem;background:#e0f2fe;color:#0369a1;border-color:#bae6fd;text-decoration:none">📄 View Prescription</a>
+          {% endif %}
+
+          <form method="post" action="{% url 'delete_consultation' c.id %}" onsubmit="return confirm('Delete this consultation?')" style="margin:0">
+            {% csrf_token %}
+            <button type="submit" class="del-btn" title="Delete">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+              </svg>Delete
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div style="text-align:center;padding:30px;color:var(--muted)">
+      <div style="font-size:2rem;margin-bottom:8px">📅</div>
+      <p style="font-size:.88rem">No consultation requests yet.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const ctx = document.getElementById('severityChart');
+  if (ctx) {
+    const chartData = {
+        'High': {{ chart_data.High|default:0 }},
+        'Moderate': {{ chart_data.Moderate|default:0 }},
+        'Low': {{ chart_data.Low|default:0 }}
+    };
+    
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['High', 'Moderate', 'Low'],
+        datasets: [{
+          data: [chartData.High, chartData.Moderate, chartData.Low],
+          backgroundColor: [
+            '#ef4444', // Danger red
+            '#f59e0b', // Warning yellow
+            '#10b981'  // Success green
+          ],
+          borderWidth: 0,
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        },
+        cutout: '65%'
+      }
+    });
+  }
+
+  // ── VITALS LINE CHART & CONTROLLERS ──────────────────────────────────────────
+  let vitalsChartInstance = null;
+  const rawVitalsData = [
+    {% for log in vitals_logs %}
+    {
+      date: "{{ log.timestamp|date:'M d, H:i' }}",
+      systolic: {{ log.systolic }},
+      diastolic: {{ log.diastolic }},
+      heart_rate: {{ log.heart_rate }},
+      temperature: {{ log.temperature }},
+      blood_glucose: {{ log.blood_glucose }},
+      sleep: {{ log.sleep_hours }},
+      hydration: {{ log.hydration_ml }}
+    },
+    {% endfor %}
+  ];
+
+  window.switchVitalsChart = function(type) {
+    const btnBp = document.getElementById('btn-chart-bp');
+    const btnGlucose = document.getElementById('btn-chart-glucose');
+    const btnWellness = document.getElementById('btn-chart-wellness');
+    
+    if (btnBp) btnBp.className = 'btn btn-sm btn-outline';
+    if (btnGlucose) btnGlucose.className = 'btn btn-sm btn-outline';
+    if (btnWellness) btnWellness.className = 'btn btn-sm btn-outline';
+    
+    if(type === 'bp' && btnBp) btnBp.className = 'btn btn-sm btn-primary';
+    if(type === 'glucose' && btnGlucose) btnGlucose.className = 'btn btn-sm btn-primary';
+    if(type === 'wellness' && btnWellness) btnWellness.className = 'btn btn-sm btn-primary';
+
+    const canvas = document.getElementById('vitalsTrendChart');
+    if (!canvas) return;
+    const vctx = canvas.getContext('2d');
+    if(vitalsChartInstance) {
+      vitalsChartInstance.destroy();
+    }
+
+    // Sort logs chronologically for the trend chart
+    const chronologicalData = [...rawVitalsData].reverse();
+    const labels = chronologicalData.map(d => d.date);
+    let datasets = [];
+
+    if(type === 'bp') {
+      datasets = [
+        {
+          label: 'BP Systolic (Normal: <120)',
+          data: chronologicalData.map(d => d.systolic),
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.05)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'BP Diastolic (Normal: <80)',
+          data: chronologicalData.map(d => d.diastolic),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.05)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Pulse (Normal: 60-100)',
+          data: chronologicalData.map(d => d.heart_rate),
+          borderColor: '#10b981',
+          backgroundColor: 'transparent',
+          tension: 0.4
+        }
+      ];
+    } else if(type === 'glucose') {
+      datasets = [
+        {
+          label: 'Blood Glucose (mg/dL) (Normal: 70-140)',
+          data: chronologicalData.map(d => d.blood_glucose),
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          tension: 0.3,
+          fill: true
+        }
+      ];
+    } else if(type === 'wellness') {
+      datasets = [
+        {
+          label: 'Sleep Hours (Target: 7-9)',
+          data: chronologicalData.map(d => d.sleep),
+          borderColor: '#8b5cf6',
+          backgroundColor: 'rgba(139, 92, 246, 0.05)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Water Intake (ml) / 100',
+          data: chronologicalData.map(d => d.hydration / 100),
+          borderColor: '#06b6d4',
+          backgroundColor: 'rgba(6, 182, 212, 0.05)',
+          tension: 0.4,
+          fill: true
+        }
+      ];
+    }
+
+    vitalsChartInstance = new Chart(vctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } }
+        },
+        scales: {
+          y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 9 } } },
+          x: { grid: { display: false }, ticks: { font: { size: 8 } } }
+        }
+      }
+    });
+  };
+
+  // Initialize line chart
+  if(document.getElementById('vitalsTrendChart')) {
+    switchVitalsChart('bp');
+  }
+
+  // ── VITALS & MEDICATION AJAX HANDLERS ──────────────────────────────────────────
+  window.submitVitals = async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+      systolic: form.systolic.value,
+      diastolic: form.diastolic.value,
+      heart_rate: form.heart_rate.value,
+      temperature: form.temperature.value,
+      blood_glucose: form.blood_glucose.value,
+      sleep_hours: form.sleep_hours.value,
+      hydration_ml: form.hydration_ml.value
+    };
+
+    try {
+      const resp = await fetch("{% url 'vitals_add' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify(data)
+      });
+      const result = await resp.json();
+      if(result.status === 'success') {
+        location.reload();
+      } else {
+        alert("Error saving vitals: " + result.error);
+      }
+    } catch(err) {
+      alert("Error contacting server to save vitals.");
+    }
+  };
+
+  window.submitMedication = async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+      name: form.name.value,
+      dosage: form.dosage.value,
+      frequency: form.frequency.value,
+      time: form.time.value
+    };
+
+    try {
+      const resp = await fetch("{% url 'medication_add' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify(data)
+      });
+      const result = await resp.json();
+      if(result.status === 'success') {
+        location.reload();
+      } else {
+        alert("Error scheduling medication: " + result.error);
+      }
+    } catch(err) {
+      alert("Error contacting server to schedule medication.");
+    }
+  };
+
+  window.toggleMedication = async function(id) {
+    try {
+      const resp = await fetch(`/medication/toggle/${id}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+      });
+      const result = await resp.json();
+      if(result.status === 'success') {
+        location.reload();
+      }
+    } catch(err) {
+      alert("Error toggling medication active status.");
+    }
+  };
+
+  window.deleteMedication = async function(id) {
+    if(!confirm("Are you sure you want to delete this medication schedule?")) return;
+    try {
+      const resp = await fetch(`/medication/delete/${id}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+      });
+      const result = await resp.json();
+      if(result.status === 'success') {
+        location.reload();
+      }
+    } catch(err) {
+      alert("Error deleting medication reminder.");
+    }
+  };
+
+  // ── ACTIVE ALARM NOTIFICATION SYSTEM ──────────────────────────────────────────
+  function checkMedicationAlarms() {
+    const activeMeds = [
+      {% for med in medications %}
+        {% if med.active %}
+        {
+          name: "{{ med.name }}",
+          dosage: "{{ med.dosage }}",
+          timeStr: "{{ med.time|time:'H:i' }}"
+        },
+        {% endif %}
+      {% endfor %}
+    ];
+
+    const now = new Date();
+    const currentHourMin = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    activeMeds.forEach(med => {
+      if(med.timeStr === currentHourMin) {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification(`💊 MediAI Medication Reminder`, {
+            body: `It's time to take your ${med.name} (${med.dosage})!`,
+            icon: '❇️'
+          });
+        } else {
+          alert(`⏰ MEDICINE DUE NOW:\n\nIt is ${currentHourMin}. Please take your scheduled dose of: ${med.name} (${med.dosage})!`);
+        }
+      }
+    });
+  }
+
+  if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+    Notification.requestPermission();
+  }
+
+  setInterval(checkMedicationAlarms, 60000);
+  checkMedicationAlarms();
+
+  // ── DRUG INTERACTION CHECKER ──────────────────────────────────────────
+  window.checkDrugInteractions = async function() {
+    const drug1 = document.getElementById('drug1').value.trim();
+    const drug2 = document.getElementById('drug2').value.trim();
+    const resDiv = document.getElementById('interaction-result');
+    if(!drug1 || !drug2) {
+      alert("Please enter both medications.");
+      return;
+    }
+    resDiv.style.display = 'block';
+    resDiv.innerHTML = "Analyzing combination safety...";
+    
+    try {
+      const resp = await fetch("{% url 'check_interactions' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({drug1, drug2})
+      });
+      const result = await resp.json();
+      resDiv.innerHTML = result.result;
+      if (result.severity === 'danger') {
+        resDiv.style.background = '#fef2f2';
+        resDiv.style.border = '1px solid #fca5a5';
+        resDiv.style.color = '#b91c1c';
+      } else if (result.severity === 'warning') {
+        resDiv.style.background = '#fffbeb';
+        resDiv.style.border = '1px solid #fde047';
+        resDiv.style.color = '#b45309';
+      } else {
+        resDiv.style.background = '#f0fdf4';
+        resDiv.style.border = '1px solid #86efac';
+        resDiv.style.color = '#15803d';
+      }
+    } catch (err) {
+      resDiv.innerHTML = "Error checking interactions. Please try again.";
+    }
+  };
+
+  // ── APPOINTMENT BOOKING AJAX HANDLERS ────────────────────────────────
+  window.validateTimeBlock = function(input) {
+    const date = new Date(input.value);
+    const minutes = date.getMinutes();
+    if (minutes !== 0 && minutes !== 30) {
+      alert("Please select a 30-minute interval block (e.g., 10:00, 10:30, 11:00).");
+      input.value = "";
+    }
+  };
+
+  window.toggleBookingFields = function(select) {
+    const isHospital = select.value === 'hospital';
+    document.getElementById('doctor-select-grp').style.display = isHospital ? 'none' : 'block';
+    document.getElementById('hospital-select-grp').style.display = isHospital ? 'block' : 'none';
+    
+    // Set required attribute based on target
+    document.getElementById('doctor_id').required = !isHospital;
+    document.getElementById('hospital_name').required = isHospital;
+  };
+
+  window.submitBooking = async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+      booking_target: form.booking_target.value,
+      scheduled_time: form.scheduled_time.value,
+      notes: form.notes.value
+    };
+
+    if (data.booking_target === 'hospital') {
+      data.hospital_name = form.hospital_name.value;
+    } else {
+      data.doctor_id = form.doctor_id.value;
+    }
+
+    try {
+      const resp = await fetch("{% url 'book_appointment' %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify(data)
+      });
+      const result = await resp.json();
+      if (result.status === 'success') {
+        alert(result.message);
+        location.reload();
+      } else {
+        alert("Error booking appointment: " + result.error);
+      }
+    } catch(err) {
+      alert("Error contacting server to book appointment.");
+    }
+  };
+});
+</script>
+
+<!-- Interactive Booking Calendar Modal -->
+{% if not is_doctor %}
+<div id="booking-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; padding: 20px;">
+  <div style="background: #fff; border-radius: 16px; max-width: 500px; width: 100%; padding: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
+    <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text); margin-bottom: 16px;">📅 Book a 30-Minute Consultation</h3>
+    <form id="booking-form" onsubmit="submitBooking(event)">
+      
+      <div style="margin-bottom: 14px;">
+        <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Booking Type</label>
+        <select name="booking_target" required class="form-control" onchange="toggleBookingFields(this)">
+          <option value="doctor">Consultation with Doctor</option>
+          <option value="hospital">Visit Nearby Hospital</option>
+        </select>
+      </div>
+
+      <div id="doctor-select-grp" style="margin-bottom: 14px;">
+        <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Choose Doctor</label>
+        <select name="doctor_id" id="doctor_id" required class="form-control">
+          <option value="">Select a Doctor</option>
+          {% for doc in doctors %}
+            <option value="{{ doc.id }}">Dr. {{ doc.user.get_full_name|default:doc.user.username }} ({{ doc.specialization }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="hospital-select-grp" style="margin-bottom: 14px; display: none;">
+        <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Choose Hospital</label>
+        <select name="hospital_name" id="hospital_name" class="form-control">
+          <option value="">Select a Hospital</option>
+          {% for hosp in hospitals %}
+            <option value="{{ hosp.name }}">{{ hosp.name }} ({{ hosp.city }} - Rating: {{ hosp.rating }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="margin-bottom: 14px;">
+        <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Select Date & Time Block</label>
+        <input type="datetime-local" name="scheduled_time" id="booking-time" required class="form-control" onchange="validateTimeBlock(this)">
+        <small style="color:var(--muted); font-size: 0.75rem;">Appointments are scheduled in 30-minute intervals (e.g., 9:00, 9:30).</small>
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 4px;">Reason / Notes</label>
+        <textarea name="notes" placeholder="Describe symptoms or reason for visit..." class="form-control" rows="3"></textarea>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" onclick="document.getElementById('booking-modal').style.display='none'" class="btn btn-outline btn-sm">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Confirm Booking</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

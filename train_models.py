@@ -1,0 +1,376 @@
+"""
+train_models.py - Run this script ONCE to generate and train all ML models.
+Usage: python train_models.py
+Place this file in the project root (next to manage.py).
+"""
+import os
+import sys
+import json
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import joblib
+
+# ── Symptom & Disease definitions ─────────────────────────────────────────────
+# [ignoring loop detection]
+DISEASES = {
+    "Common Cold": ["runny_nose", "sneezing", "sore_throat", "cough", "mild_fever", "headache", "fatigue", "swollen_glands", "sneezing_fits"],
+    "Influenza": ["high_fever", "body_ache", "severe_headache", "fatigue", "cough", "chills", "sweating", "extreme_fatigue", "sweating_excessive", "muscle_weakness"],
+    "COVID-19": ["fever", "dry_cough", "loss_of_smell", "loss_of_taste", "breathlessness", "fatigue", "body_ache", "difficulty_breathing", "extreme_fatigue"],
+    "Pneumonia": ["high_fever", "cough", "breathlessness", "chest_pain", "chills", "fatigue", "sweating", "difficulty_breathing", "extreme_fatigue"],
+    "Bronchitis": ["cough", "mucus_production", "chest_discomfort", "fatigue", "mild_fever", "breathlessness", "nighttime_cough"],
+    "Asthma": ["breathlessness", "wheezing", "chest_tightness", "cough", "night_symptoms", "difficulty_breathing", "nighttime_cough"],
+    "Dengue Fever": ["high_fever", "severe_headache", "eye_pain", "joint_pain", "rash", "nausea", "vomiting"],
+    "Malaria": ["high_fever", "chills", "sweating", "headache", "nausea", "vomiting", "fatigue"],
+    "Typhoid": ["sustained_fever", "abdominal_pain", "headache", "constipation", "diarrhea", "weakness", "rash"],
+    "Gastroenteritis": ["nausea", "vomiting", "diarrhea", "abdominal_cramps", "low_fever", "fatigue"],
+    "Acid Reflux (GERD)": ["heartburn", "regurgitation", "chest_pain", "difficulty_swallowing", "bloating", "stomach_acid", "stomach_bloating"],
+    "Irritable Bowel Syndrome": ["abdominal_cramps", "bloating", "diarrhea", "constipation", "mucus_in_stool"],
+    "Hypertension": ["severe_headache", "dizziness", "blurred_vision", "shortness_of_breath", "nosebleed"],
+    "Diabetes": ["increased_thirst", "frequent_urination", "fatigue", "blurred_vision", "slow_healing", "weight_loss", "weight_loss_unexplained"],
+    "Anemia": ["fatigue", "pale_skin", "shortness_of_breath", "dizziness", "cold_hands", "brittle_nails", "extreme_fatigue", "muscle_weakness"],
+    "Migraine": ["severe_headache", "nausea", "vomiting", "light_sensitivity", "sound_sensitivity", "aura"],
+    "Tension Headache": ["mild_headache", "neck_stiffness", "scalp_tenderness", "fatigue"],
+    "Anxiety Disorder": ["excessive_worry", "restlessness", "fatigue", "difficulty_concentrating", "muscle_tension", "sleep_issues", "mood_swings"],
+    "Depression": ["persistent_sadness", "loss_of_interest", "fatigue", "sleep_issues", "appetite_changes", "difficulty_concentrating", "extreme_fatigue", "mood_swings"],
+    "Urinary Tract Infection": ["burning_urination", "frequent_urination", "cloudy_urine", "pelvic_pain", "low_fever"],
+    "Kidney Stones": ["severe_back_pain", "pain_during_urination", "blood_in_urine", "nausea", "vomiting", "frequent_urination"],
+    "Arthritis": ["joint_pain", "joint_stiffness", "swelling", "reduced_range_of_motion", "fatigue", "joint_swelling"],
+    "Chickenpox": ["itchy_rash", "blisters", "fever", "fatigue", "loss_of_appetite", "headache", "swollen_glands"],
+    "Measles": ["high_fever", "rash", "cough", "runny_nose", "red_eyes", "sensitivity_to_light", "swollen_glands"],
+    "Conjunctivitis": ["red_eyes", "discharge", "itching", "tearing", "blurred_vision"],
+    "Sinusitis": ["facial_pain", "nasal_congestion", "thick_nasal_discharge", "headache", "reduced_smell", "cough"],
+    "Tonsillitis": ["sore_throat", "difficulty_swallowing", "swollen_tonsils", "fever", "bad_breath", "neck_pain", "swollen_glands"],
+    "Appendicitis": ["severe_abdominal_pain", "nausea", "vomiting", "fever", "loss_of_appetite", "abdominal_rigidity"],
+    "Hypothyroidism": ["fatigue", "weight_gain", "cold_sensitivity", "constipation", "dry_skin", "hair_loss", "depression", "extreme_fatigue"],
+    "Hyperthyroidism": ["weight_loss", "rapid_heartbeat", "sweating", "anxiety", "tremor", "heat_sensitivity", "frequent_bowel", "trembling_hands", "sweating_excessive", "weight_loss_unexplained"],
+    "Hepatitis B": ["jaundice", "abdominal_pain", "dark_urine", "fatigue", "nausea", "vomiting", "fever"],
+    "Tuberculosis": ["persistent_cough", "blood_in_sputum", "night_sweats", "weight_loss", "fever", "fatigue", "chest_pain", "weight_loss_unexplained"],
+    "Peptic Ulcer": ["burning_stomach_pain", "nausea", "bloating", "heartburn", "dark_stool", "vomiting_blood", "stomach_acid", "stomach_bloating"],
+    "Allergic Reaction": ["rash", "itching", "swelling", "runny_nose", "sneezing", "watery_eyes", "sneezing_fits", "difficulty_breathing"],
+    "Food Poisoning": ["nausea", "vomiting", "diarrhea", "abdominal_cramps", "fever", "weakness", "muscle_weakness"],
+    "Sciatica": ["lower_back_pain", "leg_pain", "numbness", "tingling", "weakness_in_leg", "muscle_weakness"],
+    "Psoriasis": ["red_patches", "silvery_scales", "dry_skin", "itching", "burning", "joint_pain", "joint_swelling", "dry_eyes"],
+    "Eczema": ["itchy_skin", "red_skin", "dry_skin", "blisters", "skin_thickening", "swelling", "dry_eyes"],
+    "Panic Disorder": ["sudden_chest_pain", "rapid_heartbeat", "sweating", "trembling", "shortness_of_breath", "dizziness", "fear", "chest_pressure", "trembling_hands"],
+    "Insomnia": ["difficulty_falling_asleep", "waking_frequently", "waking_early", "fatigue", "irritability", "difficulty_concentrating", "mood_swings"],
+    "Vertigo": ["dizziness", "spinning_sensation", "nausea", "vomiting", "balance_problems", "headache"],
+    "Heart Attack": ["chest_pain", "shortness_of_breath", "left_arm_pain", "sweating", "nausea", "dizziness", "chest_pressure", "sweating_excessive"],
+    "COPD": ["shortness_of_breath", "wheezing", "chest_tightness", "chronic_cough", "mucus_production", "fatigue", "difficulty_breathing"],
+    "Epilepsy": ["seizures", "temporary_confusion", "staring_spell", "uncontrollable_jerking", "loss_of_consciousness", "fear"],
+    "Parkinsons Disease": ["tremor", "slowed_movement", "rigid_muscles", "impaired_posture", "loss_of_automatic_movements", "speech_changes", "trembling_hands"],
+    "Lupus": ["fatigue", "fever", "joint_pain", "butterfly_rash", "skin_lesions", "shortness_of_breath", "dry_eyes", "joint_swelling"],
+    "Rheumatoid Arthritis": ["tender_joints", "swollen_joints", "joint_stiffness", "fatigue", "fever", "loss_of_appetite", "joint_swelling"],
+    "Gout": ["intense_joint_pain", "lingering_discomfort", "inflammation_and_redness", "limited_range_of_motion", "joint_swelling"],
+    "Chronic Kidney Disease": ["nausea", "vomiting", "loss_of_appetite", "fatigue", "sleep_issues", "changes_in_urination", "muscle_twitches", "swelling", "high_blood_pressure"],
+    "Crohns Disease": ["diarrhea", "fever", "fatigue", "abdominal_pain", "blood_in_stool", "mouth_sores", "reduced_appetite", "weight_loss"],
+    "Celiac Disease": ["diarrhea", "fatigue", "weight_loss", "bloating_and_gas", "abdominal_pain", "nausea", "constipation", "stomach_bloating"]
+}
+
+DISEASE_PRECAUTIONS = {
+    "Common Cold": ["Rest well", "Stay hydrated", "Use saline nasal drops", "Avoid close contact with others"],
+    "Influenza": ["Get flu vaccine annually", "Rest and hydrate", "Antiviral medication if prescribed", "Wear a mask"],
+    "COVID-19": ["Isolate immediately", "Consult a doctor for testing", "Monitor oxygen levels", "Stay hydrated and rest"],
+    "Pneumonia": ["Seek medical care urgently", "Antibiotics if prescribed", "Rest completely", "Stay hydrated"],
+    "Bronchitis": ["Avoid smoking and smoke", "Use a humidifier", "Stay hydrated", "Take prescribed medications"],
+    "Asthma": ["Carry inhaler at all times", "Avoid known triggers", "Follow asthma action plan", "Monitor peak flow"],
+    "Dengue Fever": ["Use mosquito repellent", "Wear protective clothing", "Eliminate standing water", "Seek hospital care"],
+    "Malaria": ["Take antimalarial medication", "Use insecticide-treated nets", "Seek immediate treatment", "Avoid mosquito bites"],
+    "Typhoid": ["Drink only purified water", "Wash hands thoroughly", "Take prescribed antibiotics", "Avoid raw foods"],
+    "Gastroenteritis": ["Stay hydrated with ORS", "Eat bland foods (BRAT diet)", "Wash hands frequently", "Rest"],
+    "Acid Reflux (GERD)": ["Avoid spicy and fatty foods", "Eat smaller meals", "Don't lie down after eating", "Maintain healthy weight"],
+    "Irritable Bowel Syndrome": ["Manage stress", "Identify food triggers", "Eat high-fiber foods", "Stay hydrated"],
+    "Hypertension": ["Monitor blood pressure daily", "Reduce sodium intake", "Exercise regularly", "Take prescribed medication"],
+    "Diabetes": ["Monitor blood sugar regularly", "Follow diabetic diet", "Exercise daily", "Take prescribed insulin/medication"],
+    "Anemia": ["Eat iron-rich foods", "Take iron supplements if prescribed", "Vitamin C aids iron absorption", "Consult a doctor"],
+    "Migraine": ["Rest in a dark quiet room", "Stay hydrated", "Take prescribed medication", "Identify and avoid triggers"],
+    "Tension Headache": ["Manage stress", "Maintain good posture", "Take OTC pain relievers", "Apply warm compress"],
+    "Anxiety Disorder": ["Practice deep breathing", "Seek therapy (CBT)", "Regular exercise", "Avoid caffeine"],
+    "Depression": ["Seek professional help", "Maintain social connections", "Regular exercise", "Follow treatment plan"],
+    "Urinary Tract Infection": ["Drink plenty of water", "Take prescribed antibiotics", "Avoid irritants", "Practice good hygiene"],
+    "Kidney Stones": ["Drink 2-3 liters water daily", "Reduce sodium and protein", "Take prescribed medication", "Seek medical care for severe pain"],
+    "Arthritis": ["Exercise gently", "Apply hot/cold packs", "Maintain healthy weight", "Take prescribed medication"],
+    "Chickenpox": ["Avoid scratching", "Use calamine lotion", "Rest and stay hydrated", "Isolate to prevent spread"],
+    "Measles": ["Isolate from others", "Rest and hydrate", "Vitamin A supplements", "Consult a doctor"],
+    "Conjunctivitis": ["Avoid touching eyes", "Wash hands frequently", "Use prescribed eye drops", "Avoid sharing towels"],
+    "Sinusitis": ["Use saline nasal rinse", "Steam inhalation", "Drink fluids", "Take prescribed medication"],
+    "Tonsillitis": ["Rest and stay hydrated", "Gargle warm salt water", "Take prescribed antibiotics", "Eat soft foods"],
+    "Appendicitis": ["Seek emergency care immediately", "Do not eat or drink", "Avoid painkillers until diagnosis", "Surgery may be needed"],
+    "Hypothyroidism": ["Take prescribed thyroid medication", "Regular thyroid function tests", "Eat iodine-rich foods", "Exercise regularly"],
+    "Hyperthyroidism": ["Take prescribed antithyroid medication", "Regular monitoring", "Avoid caffeine", "Protect eyes from UV"],
+    "Hepatitis B": ["Get vaccinated", "Avoid alcohol", "Take prescribed antiviral medication", "Regular liver function tests"],
+    "Tuberculosis": ["Complete full course of antibiotics", "Isolate during infectious period", "Improve ventilation", "Regular follow-ups"],
+    "Peptic Ulcer": ["Avoid NSAIDs", "Reduce alcohol and smoking", "Take prescribed medication (PPIs)", "Eat smaller frequent meals"],
+    "Allergic Reaction": ["Identify and avoid allergens", "Carry antihistamines", "Use prescribed medication", "Wear medical alert ID"],
+    "Food Poisoning": ["Rest and rehydrate", "Use ORS for dehydration", "Avoid solid food initially", "Seek care if severe"],
+    "Sciatica": ["Rest and avoid heavy lifting", "Apply ice then heat", "Gentle stretching exercises", "Take anti-inflammatories"],
+    "Psoriasis": ["Moisturize skin regularly", "Avoid triggers (stress, infections)", "Use prescribed topicals", "Regular dermatologist visits"],
+    "Eczema": ["Moisturize daily", "Avoid harsh soaps", "Use prescribed corticosteroids", "Identify and avoid triggers"],
+    "Panic Disorder": ["Practice breathing techniques", "Seek cognitive behavioral therapy", "Avoid caffeine", "Regular exercise"],
+    "Insomnia": ["Maintain consistent sleep schedule", "Avoid screens before bed", "Create dark quiet sleep environment", "Limit caffeine"],
+    "Vertigo": ["Move slowly and carefully", "Avoid sudden movements", "Epley maneuver if BPPV", "Consult a neurologist"],
+    "Heart Attack": ["Seek emergency medical help immediately", "Chew aspirin if recommended by emergency dispatch", "Stay calm and rest"],
+    "COPD": ["Quit smoking", "Avoid lung irritants", "Get annual flu vaccine", "Practice breathing exercises"],
+    "Epilepsy": ["Take anti-seizure medication exactly as prescribed", "Get adequate sleep", "Avoid known triggers", "Wear a medical alert bracelet"],
+    "Parkinsons Disease": ["Take medications on schedule", "Exercise regularly", "Work with physical therapist", "Eat a balanced diet"],
+    "Lupus": ["Avoid sun exposure", "Get adequate rest", "Exercise regularly", "Don't smoke"],
+    "Rheumatoid Arthritis": ["Rest during flares", "Apply heat or cold", "Use assistive devices", "Exercise to maintain joint mobility"],
+    "Gout": ["Avoid purine-rich foods", "Limit alcohol consumption", "Stay well hydrated", "Maintain healthy weight"],
+    "Chronic Kidney Disease": ["Follow a kidney-friendly diet", "Control blood pressure", "Monitor blood sugar", "Take prescribed medications"],
+    "Crohns Disease": ["Follow dietary recommendations", "Quit smoking", "Manage stress", "Take prescribed medications consistently"],
+    "Celiac Disease": ["Strict adherence to gluten-free diet", "Read food labels carefully", "Avoid cross-contamination", "Take vitamin supplements if prescribed"]
+}
+
+DISEASE_HOME_CARE = {
+    "Common Cold": ["Drink warm fluids (honey-lemon tea, broth)", "Gargle warm salt water", "Use steam inhalation", "Rest and sleep adequately"],
+    "Influenza": ["Rest completely for 5-7 days", "Stay well hydrated", "Take paracetamol for fever", "Eat nutrient-rich foods"],
+    "COVID-19": ["Isolate and rest at home", "Monitor oxygen levels with pulse oximeter", "Drink warm fluids regularly", "Take paracetamol if needed"],
+    "Pneumonia": ["Rest completely", "Breathe warm steam", "Take all prescribed medications", "Monitor breathing rate carefully"],
+    "Bronchitis": ["Stay hydrated", "Use a cool-mist humidifier", "Avoid irritants and cold air", "Rest voice and body"],
+    "Asthma": ["Use rescue inhaler as prescribed", "Avoid known triggers", "Practice pursed-lip breathing", "Keep indoor air clean"],
+    "Dengue Fever": ["Drink plenty of fluids and ORS", "Rest completely", "Take paracetamol (avoid aspirin/ibuprofen)", "Monitor platelet levels"],
+    "Malaria": ["Take all antimalarial tablets as prescribed", "Rest and stay hydrated", "Use mosquito nets while sleeping", "Monitor temperature regularly"],
+    "Typhoid": ["Eat easily digestible foods", "Drink only boiled/filtered water", "Rest completely", "Take antibiotics as prescribed"],
+    "Gastroenteritis": ["Sip ORS frequently", "Eat BRAT diet (banana, rice, applesauce, toast)", "Avoid dairy and fatty foods", "Rest"],
+    "Acid Reflux (GERD)": ["Eat small meals every 3-4 hours", "Avoid lying down after meals", "Elevate head of bed", "Avoid coffee, alcohol, spicy food"],
+    "Irritable Bowel Syndrome": ["Keep a food diary", "Exercise regularly", "Practice stress management", "Eat soluble fiber gradually"],
+    "Hypertension": ["Reduce salt intake drastically", "Exercise 30 min daily (walking)", "Limit alcohol", "Practice deep breathing"],
+    "Diabetes": ["Monitor blood sugar 2-4 times daily", "Follow a low glycemic index diet", "Exercise 30 min daily", "Take medications regularly"],
+    "Anemia": ["Eat spinach, lentils, liver, beans", "Pair iron foods with vitamin C", "Avoid tea/coffee with meals", "Take prescribed iron supplements"],
+    "Migraine": ["Lie in a dark, quiet room", "Apply cold pack to forehead", "Stay hydrated", "Take prescribed medication at onset"],
+    "Tension Headache": ["Apply warm compress to neck and shoulders", "Rest and reduce screen time", "Take OTC pain relievers", "Practice relaxation techniques"],
+    "Anxiety Disorder": ["Practice 4-7-8 breathing", "Do progressive muscle relaxation", "Limit caffeine and alcohol", "Maintain regular sleep schedule"],
+    "Depression": ["Stick to a daily routine", "Get sunlight and fresh air daily", "Exercise regularly", "Connect with trusted friends/family"],
+    "Urinary Tract Infection": ["Drink 8+ glasses of water daily", "Urinate frequently - do not hold", "Take all antibiotics as prescribed", "Avoid coffee and alcohol"],
+    "Kidney Stones": ["Drink 2-3 liters of water daily", "Take pain relievers as needed", "Strain urine to catch the stone", "Avoid oxalate-rich foods"],
+    "Arthritis": ["Apply heat before activity, cold after", "Do gentle range-of-motion exercises", "Maintain healthy weight", "Use supportive footwear"],
+    "Chickenpox": ["Apply calamine lotion to relieve itching", "Trim fingernails to avoid scratching", "Take oatmeal baths", "Take antihistamines for itch relief"],
+    "Measles": ["Rest in a cool, dark room", "Stay hydrated", "Take vitamin A supplements", "Use fever-reducing medication"],
+    "Conjunctivitis": ["Apply warm compress to eyes", "Clean discharge with sterile gauze", "Avoid touching eyes", "Use prescribed eye drops"],
+    "Sinusitis": ["Steam inhalation 2-3 times daily", "Saline nasal rinse", "Stay hydrated", "Elevate head while sleeping"],
+    "Tonsillitis": ["Gargle warm salt water 3-4 times daily", "Eat cold soothing foods (ice cream)", "Stay hydrated", "Rest voice completely"],
+    "Appendicitis": ["Go to emergency room immediately", "Do not eat or drink anything", "Do not take pain medication before diagnosis", "Do not apply heat to abdomen"],
+    "Hypothyroidism": ["Take thyroid medication on empty stomach", "Eat iodine-rich foods (fish, dairy)", "Exercise regularly", "Get adequate sleep"],
+    "Hyperthyroidism": ["Avoid iodine-rich foods", "Rest and reduce stress", "Wear sunglasses outdoors", "Take medication as prescribed"],
+    "Hepatitis B": ["Avoid alcohol completely", "Rest and eat nutritious food", "Stay hydrated", "Avoid over-the-counter pain medications"],
+    "Tuberculosis": ["Take all medications for full 6 months", "Ventilate living spaces", "Eat high-protein nutritious food", "Rest adequately"],
+    "Peptic Ulcer": ["Eat small, frequent bland meals", "Avoid spicy food, coffee, alcohol", "Don't skip meals", "Take antacids as directed"],
+    "Allergic Reaction": ["Take antihistamine immediately", "Identify and remove the allergen", "Apply cool compress to skin reactions", "Use prescribed medication"],
+    "Food Poisoning": ["Drink ORS to replace fluids", "Eat clear broth and dry crackers", "Avoid solid food for a few hours", "Rest"],
+    "Sciatica": ["Apply ice for 20 min, then heat", "Do gentle stretching exercises", "Avoid prolonged sitting", "Take anti-inflammatory medication"],
+    "Psoriasis": ["Moisturize skin 2-3 times daily", "Take short lukewarm showers", "Use gentle fragrance-free soaps", "Get moderate sun exposure"],
+    "Eczema": ["Apply thick moisturizer after bathing", "Use lukewarm water only", "Avoid scratching", "Wear soft, breathable fabrics"],
+    "Panic Disorder": ["Practice slow deep breathing during attacks", "Ground yourself using 5-4-3-2-1 technique", "Avoid caffeine", "Exercise regularly"],
+    "Insomnia": ["Keep consistent sleep/wake times", "Avoid screens 1 hour before bed", "Create a cool, dark sleeping environment", "Avoid large meals before bed"],
+    "Vertigo": ["Rest in a comfortable position", "Move slowly and avoid sudden head turns", "Perform Epley maneuver if BPPV", "Stay hydrated"],
+    "Heart Attack": ["DO NOT attempt home care. Wait for emergency services.", "Unlock the door for paramedics", "Rest in a comfortable position"],
+    "COPD": ["Use prescribed inhalers correctly", "Pursed-lip breathing", "Stay indoors on bad air quality days", "Eat small frequent meals"],
+    "Epilepsy": ["During a seizure: cushion head, loosen tight neckwear, turn on side", "Do not put anything in mouth", "Time the seizure"],
+    "Parkinsons Disease": ["Remove tripping hazards at home", "Install grab bars in bathroom", "Eat high-fiber foods to prevent constipation", "Stay hydrated"],
+    "Lupus": ["Use high SPF sunscreen", "Pace yourself to manage fatigue", "Apply warm compresses to painful joints", "Eat an anti-inflammatory diet"],
+    "Rheumatoid Arthritis": ["Alternate heat (for stiffness) and cold (for acute pain)", "Use ergonomic tools", "Gentle range of motion exercises daily", "Rest frequently"],
+    "Gout": ["Elevate the affected joint", "Apply ice pack to reduce inflammation", "Drink 8-16 cups of fluid daily", "Avoid meat and seafood"],
+    "Chronic Kidney Disease": ["Limit sodium, potassium, and phosphorus intake", "Track fluid intake", "Eat appropriate amounts of protein", "Stay active"],
+    "Crohns Disease": ["Eat small, frequent meals", "Drink plenty of liquids", "Identify and avoid trigger foods", "Consider a low-residue diet during flares"],
+    "Celiac Disease": ["Completely eliminate gluten (wheat, barley, rye)", "Use separate cooking utensils", "Focus on fresh fruits, vegetables, and lean proteins", "Learn hidden sources of gluten"]
+}
+
+DISEASE_MEDICATIONS = {
+    "Common Cold": ["Paracetamol (for fever/ache)", "Antihistamines (for runny nose)", "Cough drops"],
+    "Influenza": ["Paracetamol or Ibuprofen", "Oseltamivir (only if prescribed)", "Decongestants"],
+    "COVID-19": ["Paracetamol (for fever)", "Prescribed antivirals (e.g., Paxlovid)"],
+    "Pneumonia": ["Prescribed Antibiotics", "Fever reducers (Ibuprofen/Acetaminophen)"],
+    "Bronchitis": ["Cough suppressants", "Pain relievers (Paracetamol)", "Bronchodilators (if prescribed)"],
+    "Asthma": ["Short-acting beta-agonists (Albuterol)", "Inhaled corticosteroids"],
+    "Dengue Fever": ["Paracetamol (AVOID Aspirin/Ibuprofen)", "Oral Rehydration Salts (ORS)"],
+    "Malaria": ["Prescribed Antimalarials (Artemisinin-based)", "Paracetamol for fever"],
+    "Typhoid": ["Prescribed Antibiotics (Ciprofloxacin, Azithromycin)", "Paracetamol"],
+    "Gastroenteritis": ["Oral Rehydration Salts (ORS)", "Loperamide (if advised)", "Probiotics"],
+    "Acid Reflux (GERD)": ["Antacids (TUMS, Gelusil)", "H2 Blockers (Famotidine)", "PPIs (Omeprazole)"],
+    "Irritable Bowel Syndrome": ["Antispasmodics", "Laxatives (for constipation)", "Anti-diarrheals"],
+    "Hypertension": ["Prescribed Antihypertensives (ACE inhibitors, Beta-blockers)"],
+    "Diabetes": ["Prescribed Insulin", "Metformin (or other oral hypoglycemics)"],
+    "Anemia": ["Iron supplements (Ferrous sulfate)", "Vitamin C (to boost absorption)", "Vitamin B12"],
+    "Migraine": ["NSAIDs (Ibuprofen, Naproxen)", "Triptans (Sumatriptan - if prescribed)"],
+    "Tension Headache": ["Aspirin", "Ibuprofen", "Acetaminophen"],
+    "Anxiety Disorder": ["Prescribed SSRIs", "Short-term Benzodiazepines (only if prescribed)"],
+    "Depression": ["Prescribed Antidepressants (SSRIs, SNRIs)"],
+    "Urinary Tract Infection": ["Prescribed Antibiotics", "Urinary analgesics (Phenazopyridine)"],
+    "Kidney Stones": ["Pain relievers (NSAIDs)", "Alpha-blockers (to help pass stone)"],
+    "Arthritis": ["NSAIDs (Ibuprofen)", "Corticosteroids", "Topical analgesics"],
+    "Chickenpox": ["Calamine lotion", "Antihistamines (for itching)", "Paracetamol (AVOID Aspirin)"],
+    "Measles": ["Paracetamol", "Vitamin A supplements"],
+    "Conjunctivitis": ["Artificial tears", "Antibiotic eye drops (if bacterial - prescribed)"],
+    "Sinusitis": ["Decongestant nasal sprays", "Saline wash", "Pain relievers"],
+    "Tonsillitis": ["Pain relievers (Acetaminophen)", "Throat lozenges", "Prescribed Antibiotics (if bacterial)"],
+    "Appendicitis": ["DO NOT take painkillers (can mask symptoms)", "Requires immediate surgery"],
+    "Hypothyroidism": ["Prescribed Levothyroxine"],
+    "Hyperthyroidism": ["Prescribed Anti-thyroid medications (Methimazole)", "Beta-blockers"],
+    "Hepatitis B": ["Prescribed Antiviral medications"],
+    "Tuberculosis": ["Prescribed TB Antibiotics (Isoniazid, Rifampin - for 6+ months)"],
+    "Peptic Ulcer": ["PPIs (Omeprazole)", "Antacids", "Prescribed Antibiotics (if H. pylori)"],
+    "Allergic Reaction": ["Antihistamines (Cetirizine, Loratadine)", "Epinephrine auto-injector (for severe anaphylaxis)"],
+    "Food Poisoning": ["Oral Rehydration Salts (ORS)", "Bismuth subsalicylate (Pepto-Bismol)"],
+    "Sciatica": ["NSAIDs (Ibuprofen, Naproxen)", "Muscle relaxants (if prescribed)"],
+    "Psoriasis": ["Topical corticosteroids", "Vitamin D analogues", "Moisturizers"],
+    "Eczema": ["Topical corticosteroids", "Antihistamines (for itching)", "Thick emollients"],
+    "Panic Disorder": ["Prescribed SSRIs", "Short-term Benzodiazepines (only if prescribed)"],
+    "Insomnia": ["Melatonin", "Prescribed sleep aids (short-term)"],
+    "Vertigo": ["Meclizine", "Dimenhydrinate (Dramamine)"],
+    "Heart Attack": ["Aspirin", "Nitroglycerin", "Thrombolytics (administered in hospital)", "Beta-blockers"],
+    "COPD": ["Bronchodilators", "Inhaled steroids", "Oral corticosteroids", "Phosphodiesterase-4 inhibitors"],
+    "Epilepsy": ["Anti-epileptic drugs (AEDs) (e.g., Levetiracetam, Valproic acid)"],
+    "Parkinsons Disease": ["Carbidopa-levodopa", "Dopamine agonists", "MAO-B inhibitors"],
+    "Lupus": ["NSAIDs", "Antimalarial drugs", "Corticosteroids", "Immunosuppressants"],
+    "Rheumatoid Arthritis": ["DMARDs (e.g., Methotrexate)", "Biologic agents", "NSAIDs", "Corticosteroids"],
+    "Gout": ["Colchicine", "NSAIDs", "Corticosteroids", "Uric acid reducers (Allopurinol)"],
+    "Chronic Kidney Disease": ["High blood pressure medications", "Cholesterol-lowering drugs", "Anemia medications", "Phosphate binders"],
+    "Crohns Disease": ["Anti-inflammatory drugs (Corticosteroids)", "Immune system suppressors", "Biologics", "Antibiotics"],
+    "Celiac Disease": ["Vitamin and mineral supplements (Iron, B12, D)", "Medications to control intestinal inflammation (if severe)"]
+}
+
+DISEASE_ACTION_LEVELS = {
+    "Appendicitis": "emergency",
+    "Pneumonia": "emergency",
+    "Heart Disease": "emergency",
+    "COVID-19": "see_doctor",
+    "Tuberculosis": "see_doctor",
+    "Hepatitis B": "see_doctor",
+    "Dengue Fever": "see_doctor",
+    "Malaria": "see_doctor",
+    "Typhoid": "see_doctor",
+    "Influenza": "see_doctor",
+    "Hypertension": "see_doctor",
+    "Diabetes": "see_doctor",
+    "Kidney Stones": "see_doctor",
+    "Anemia": "see_doctor",
+    "Hyperthyroidism": "see_doctor",
+    "Hypothyroidism": "see_doctor",
+    "Anxiety Disorder": "see_doctor",
+    "Depression": "see_doctor",
+    "Panic Disorder": "see_doctor",
+    "Migraine": "see_doctor",
+    "Arthritis": "see_doctor",
+    "Urinary Tract Infection": "see_doctor",
+    "Asthma": "see_doctor",
+    "Common Cold": "home_care",
+    "Gastroenteritis": "home_care",
+    "Bronchitis": "home_care",
+    "Acid Reflux (GERD)": "home_care",
+    "Irritable Bowel Syndrome": "home_care",
+    "Tension Headache": "home_care",
+    "Sinusitis": "home_care",
+    "Tonsillitis": "home_care",
+    "Chickenpox": "home_care",
+    "Measles": "home_care",
+    "Conjunctivitis": "home_care",
+    "Peptic Ulcer": "home_care",
+    "Allergic Reaction": "home_care",
+    "Food Poisoning": "home_care",
+    "Sciatica": "home_care",
+    "Psoriasis": "home_care",
+    "Eczema": "home_care",
+    "Insomnia": "home_care",
+    "Vertigo": "home_care",
+    "Heart Attack": "emergency",
+    "COPD": "see_doctor",
+    "Epilepsy": "see_doctor",
+    "Parkinsons Disease": "see_doctor",
+    "Lupus": "see_doctor",
+    "Rheumatoid Arthritis": "see_doctor",
+    "Gout": "see_doctor",
+    "Chronic Kidney Disease": "see_doctor",
+    "Crohns Disease": "see_doctor",
+    "Celiac Disease": "home_care"
+}
+
+# Gather all unique symptoms
+ALL_SYMPTOMS = sorted(set(s for symptoms in DISEASES.values() for s in symptoms))
+
+def generate_dataset(samples_per_disease=200):
+    rows = []
+    labels = []
+    disease_list = list(DISEASES.keys())
+    for disease, core_symptoms in DISEASES.items():
+        for _ in range(samples_per_disease):
+            row = [0] * len(ALL_SYMPTOMS)
+            # Activate 25-100% of core symptoms to train models on sparse inputs
+            active = np.random.choice(core_symptoms,
+                                       size=max(1, int(len(core_symptoms) * np.random.uniform(0.25, 1.0))),
+                                       replace=False)
+            for s in active:
+                if s in ALL_SYMPTOMS:
+                    row[ALL_SYMPTOMS.index(s)] = 1
+            # Add 0-2 random noisy symptoms
+            noise_count = np.random.randint(0, 3)
+            for _ in range(noise_count):
+                idx = np.random.randint(0, len(ALL_SYMPTOMS))
+                row[idx] = 1
+            rows.append(row)
+            labels.append(disease)
+    return pd.DataFrame(rows, columns=ALL_SYMPTOMS), labels
+
+
+from sklearn.neural_network import MLPClassifier
+
+def train_and_save():
+    print("Generating extended dataset for higher accuracy...")
+    # Balanced samples per disease to keep training fast and accurate
+    X, y = generate_dataset(300)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+    models = {
+        "Logistic Regression": LogisticRegression(max_iter=2000, random_state=42),
+        "SVC": SVC(probability=True, random_state=42),
+        "KNN": KNeighborsClassifier(n_neighbors=5, weights='distance'),
+        "Naive Bayes": GaussianNB(),
+        "Decision Tree": DecisionTreeClassifier(random_state=42),
+        "Random Forest": RandomForestClassifier(n_estimators=200, random_state=42),
+        "Neural Network (MLP)": MLPClassifier(hidden_layer_sizes=(128, 64), max_iter=1000, random_state=42)
+    }
+
+    os.makedirs("ml_models", exist_ok=True)
+    results = {}
+    best_name, best_acc, best_model = None, 0, None
+
+    print("\nTraining models...")
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        acc = accuracy_score(y_test, model.predict(X_test))
+        results[name] = round(acc, 4)
+        print(f"  {name}: {acc:.4f}")
+        joblib.dump(model, f"ml_models/{name.lower().replace(' ', '_')}.pkl")
+        if acc > best_acc:
+            best_acc, best_name, best_model = acc, name, model
+
+    # Save symptom list and metadata
+    metadata = {
+        "symptoms": ALL_SYMPTOMS,
+        "diseases": list(DISEASES.keys()),
+        "best_model": best_name,
+        "model_accuracies": results,
+        "disease_precautions": DISEASE_PRECAUTIONS,
+        "home_care": DISEASE_HOME_CARE,
+        "action_levels": DISEASE_ACTION_LEVELS,
+        "medications": DISEASE_MEDICATIONS,
+        "disease_symptoms": DISEASES,
+    }
+    with open("ml_models/metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    joblib.dump(best_model, "ml_models/best_model.pkl")
+    print(f"\n[OK] Best model: {best_name} ({best_acc:.4f})")
+    print("[OK] All models saved to ml_models/")
+    print("[OK] metadata.json saved")
+    print("\nRun: python manage.py migrate && python manage.py runserver")
+
+
+if __name__ == "__main__":
+    train_and_save()

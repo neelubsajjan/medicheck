@@ -1,0 +1,359 @@
+{% extends 'checker/base.html' %}
+{% block title %}AI Health Assistant — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .chat-wrap{max-width:860px;margin:0 auto;padding:28px 24px 80px}
+  .chat-hero{background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;border-radius:20px;
+             padding:28px 32px;margin-bottom:24px;display:flex;align-items:center;gap:18px}
+  .bot-avatar{width:60px;height:60px;background:rgba(255,255,255,.2);border-radius:50%;
+              display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0}
+  .chat-container{background:#fff;border-radius:20px;border:1px solid var(--border);
+                  box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;height:520px}
+  .chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+  .msg{display:flex;gap:10px;align-items:flex-start;animation:msgIn .3s ease}
+  @keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .msg.user{flex-direction:row-reverse}
+  .msg-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
+              justify-content:center;font-size:1rem;flex-shrink:0}
+  .msg.bot .msg-avatar{background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff}
+  .msg.user .msg-avatar{background:var(--primary-l);color:var(--primary)}
+  .msg-bubble{max-width:75%;padding:12px 16px;border-radius:18px;font-size:.9rem;line-height:1.6}
+  .msg.bot .msg-bubble{background:#f8fafc;border:1px solid var(--border);border-top-left-radius:4px;color:var(--text)}
+  .msg.user .msg-bubble{background:var(--primary);color:#fff;border-top-right-radius:4px}
+  .msg-time{font-size:.68rem;opacity:.6;margin-top:4px;text-align:right}
+
+  .chat-input-area{border-top:1px solid var(--border);padding:16px;display:flex;gap:10px;align-items:flex-end}
+  .chat-input{flex:1;resize:none;border:2px solid var(--border);border-radius:12px;padding:10px 14px;
+              font-size:.9rem;font-family:'Plus Jakarta Sans',sans-serif;min-height:44px;max-height:120px;
+              transition:border-color .2s;line-height:1.5}
+  .chat-input:focus{outline:none;border-color:var(--primary)}
+  .send-btn{width:44px;height:44px;border-radius:12px;background:var(--primary);color:#fff;
+            border:none;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;
+            justify-content:center;flex-shrink:0;transition:all .2s}
+  .send-btn:hover{background:var(--primary-d);transform:scale(1.05)}
+  .send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+  .quick-replies{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+  .qr{background:var(--primary-l);color:var(--primary);border:1px solid #bfdbfe;
+      border-radius:999px;padding:6px 13px;font-size:.78rem;font-weight:600;cursor:pointer;
+      transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif}
+  .qr:hover{background:var(--primary);color:#fff}
+
+  .analyse-chat-btn{width:100%;padding:12px;background:linear-gradient(135deg,#10b981,#059669);
+                    color:#fff;border:none;border-radius:12px;font-size:.9rem;font-weight:700;
+                    cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;margin-top:12px;
+                    display:none;transition:all .25s}
+  .analyse-chat-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(16,185,129,.35)}
+
+  .typing{display:flex;gap:5px;align-items:center;padding:10px 14px;background:#f8fafc;
+          border:1px solid var(--border);border-radius:18px;border-top-left-radius:4px;width:fit-content}
+  .typing span{width:7px;height:7px;background:var(--muted);border-radius:50%;
+               animation:bounce .9s infinite}
+  .typing span:nth-child(2){animation-delay:.15s}
+  .typing span:nth-child(3){animation-delay:.3s}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+  @keyframes pulse {
+    0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="chat-wrap">
+  <div class="chat-hero">
+    <div class="bot-avatar">🤖</div>
+    <div style="flex-grow: 1;">
+      <h2 style="font-size:1.4rem;font-weight:800">MediAI Assistant</h2>
+      <p style="opacity:.85;font-size:.88rem;margin-top:4px">AI-powered health companion — describe your symptoms in natural language</p>
+      {% if patient and patient.bmi %}
+      <div style="margin-top:8px;background:rgba(255,255,255,.15);border-radius:8px;padding:4px 12px;display:inline-block;font-size:.8rem">
+        BMI: {{ patient.bmi }} ({{ patient.bmi_category }}) · {{ patient.age }} yrs · {{ patient.gender }}
+      </div>
+      {% endif %}
+      
+      <div style="margin-top:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <span style="background:rgba(16, 185, 129, 0.25);border: 1px solid rgba(16, 185, 129, 0.45);border-radius:8px;padding:5px 12px;display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:#fff;font-weight:700">
+          <span style="width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #10b981; animation: pulse 2s infinite;"></span>
+          ✨ Live AI Active ({{ ai_model_type }})
+        </span>
+        <button class="btn btn-outline" id="apiKeyToggleBtn" onclick="toggleApiKeyForm()" style="background: rgba(255, 255, 255, 0.12); color: #fff; border-color: rgba(255, 255, 255, 0.25); font-weight: 700; gap: 6px; font-size: 0.8rem; border-radius: 8px; padding: 4px 10px; cursor: pointer; transition: all 0.2s;">
+          ⚙️ {% if has_gemini_key %}Change API Key{% else %}Configure API Key (Optional){% endif %}
+        </button>
+      </div>
+
+      <div id="apiKeyForm" style="display:none; margin-top:12px; gap:8px; align-items:center; flex-wrap:wrap; background:rgba(255,255,255,0.06); padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12);">
+        <input id="geminiApiKeyInput" type="password" placeholder="{% if has_gemini_key %}•••••••••••••••• (API Key Active){% else %}Paste custom Gemini API key{% endif %}" style="flex:1; max-width:280px; padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.08); color:#fff; font-size:.88rem;" />
+        <button class="btn" id="saveApiKeyBtn" onclick="saveApiKey()" style="background:#2563eb; color:#fff; font-weight:700; padding:6px 12px; border-radius:8px; border:none; cursor:pointer; font-size:.82rem;" type="button">Save Key</button>
+        {% if has_gemini_key %}
+        <button class="btn" id="clearApiKeyBtn" onclick="clearApiKey()" style="background:#dc2626; color:#fff; font-weight:700; padding:6px 12px; border-radius:8px; border:none; cursor:pointer; font-size:.82rem;" type="button">Clear Key</button>
+        {% endif %}
+        <div style="font-size:.76rem; color:rgba(255,255,255,0.85); width:100%; margin-top:6px;">
+          MediAI connects automatically via a keyless GPT model. Optional: Set your custom Gemini API key. Get a key from <a href="https://aistudio.google.com/" target="_blank" style="color:#93c5fd;text-decoration:underline;font-weight:700;">Google AI Studio</a>.
+        </div>
+      </div>
+    </div>
+    
+    <button class="btn btn-outline" onclick="clearConversation()" style="background: rgba(255, 255, 255, 0.15); color: #fff; border-color: rgba(255, 255, 255, 0.3); font-weight: 700; display: flex; align-items: center; gap: 6px; font-size: 0.82rem; border-radius: 10px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.25)'" onmouseout="this.style.background='rgba(255, 255, 255, 0.15)'">
+      🗑️ Clear Chat
+    </button>
+  </div>
+
+  <div class="quick-replies" id="quickReplies"></div>
+
+  <div class="chat-container">
+    <div class="chat-messages" id="chatMessages">
+      <!-- Welcome message -->
+      <div class="msg bot">
+        <div class="msg-avatar">🤖</div>
+        <div>
+          <div class="msg-bubble">
+            Hello {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %}! 👋 I'm your MediAI health assistant.<br><br>
+            Tell me how you're feeling — describe your symptoms in plain words like <em>"I have fever and cough"</em> or <em>"I feel chest pain"</em>.<br><br>
+            I'll collect your symptoms and run an AI diagnosis when ready.
+          </div>
+          <div class="msg-time">Now</div>
+        </div>
+      </div>
+      <!-- Existing messages from DB -->
+      {% for m in chat_messages %}
+      <div class="msg {{ m.role }}">
+        <div class="msg-avatar">{% if m.role == 'bot' %}🤖{% else %}👤{% endif %}</div>
+        <div>
+          <div class="msg-bubble" id="bubble-{{ m.id }}">{{ m.message }}</div>
+          <div class="msg-time">{{ m.timestamp|date:"H:i" }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chatInput" placeholder="Type your symptoms or ask a question…" rows="1"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+                oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMsg()">➤</button>
+    </div>
+  </div>
+
+  <button class="analyse-chat-btn" id="analyseChatBtn" onclick="analyseChat()">
+    🧠 Analyse Collected Symptoms with AI
+  </button>
+</div>
+
+<script>
+let chatSyms = [];
+
+// Render quick reply buttons (avoids Django's missing |split filter)
+(function initQuickReplies() {
+  const qs = [
+    "I have fever and headache",
+    "I feel chest pain",
+    "I have nausea and vomiting",
+    "I have skin rash",
+    "What can you do?",
+    "Show my BMI",
+    "Find hospitals near me"
+  ];
+  const box = document.getElementById('quickReplies');
+  if (box) {
+    box.innerHTML = qs.map(q =>
+      `<span class="qr" onclick="sendQuick('${q.replace(/'/g, "\\'")}')">  ${q}</span>`
+    ).join('');
+  }
+})();
+
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
+
+function scrollBottom(){const c=document.getElementById('chatMessages');c.scrollTop=c.scrollHeight;}
+scrollBottom();
+
+function addMsg(role, text){
+  const c=document.getElementById('chatMessages');
+  const div=document.createElement('div');
+  div.className='msg '+role;
+  const now=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  div.innerHTML=`<div class="msg-avatar">${role==='bot'?'🤖':'👤'}</div>
+    <div><div class="msg-bubble">${text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</div>
+    <div class="msg-time">${now}</div></div>`;
+  c.appendChild(div); scrollBottom();
+}
+
+function addTyping(){
+  const c=document.getElementById('chatMessages');
+  const div=document.createElement('div'); div.className='msg bot'; div.id='typing';
+  div.innerHTML='<div class="msg-avatar">🤖</div><div class="typing"><span></span><span></span><span></span></div>';
+  c.appendChild(div); scrollBottom();
+}
+
+function removeTyping(){const t=document.getElementById('typing');if(t)t.remove();}
+
+function sendQuick(text){document.getElementById('chatInput').value=text;sendMsg();}
+
+async function sendMsg(){
+  const input=document.getElementById('chatInput');
+  const msg=input.value.trim(); if(!msg) return;
+  input.value=''; input.style.height='auto';
+  document.getElementById('sendBtn').disabled=true;
+  addMsg('user',msg); addTyping();
+  try{
+    const r=await fetch("{% url 'chatbot_send' %}",{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'X-CSRFToken':'{{ csrf_token }}'
+      },
+      body:JSON.stringify({message:msg})
+    });
+    removeTyping();
+    document.getElementById('sendBtn').disabled=false;
+    
+    if(!r.ok) {
+      const text = await r.text();
+      console.error("Chat error response:", text);
+      let errorMsg = `Server error (${r.status})`;
+      try {
+        const errJson = JSON.parse(text);
+        if (errJson.error) errorMsg = errJson.error;
+      } catch(_) {}
+      addMsg('bot','⚠️ ' + errorMsg);
+      return;
+    }
+    
+    const d=await r.json();
+    addMsg('bot',d.reply);
+    chatSyms=d.symptoms||[];
+    if(chatSyms.length>=2){
+      document.getElementById('analyseChatBtn').style.display='block';
+      document.getElementById('analyseChatBtn').textContent=
+        `🧠 Analyse ${chatSyms.length} Collected Symptom(s) with AI`;
+    }
+  }catch(e){
+    removeTyping();
+    document.getElementById('sendBtn').disabled=false;
+    console.error("Fetch failure:", e);
+    addMsg('bot','⚠️ Network error: ' + e.message);
+  }
+}
+
+async function analyseChat(){
+  const btn=document.getElementById('analyseChatBtn');
+  btn.textContent='🔄 Analysing…'; btn.disabled=true;
+  try{
+    const r=await fetch("{% url 'chatbot_analyse' %}",{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'X-CSRFToken':'{{ csrf_token }}'
+      },
+      body:'{}'
+    });
+    btn.disabled=false;
+    if(!r.ok) {
+      const text = await r.text();
+      let errorMsg = `Server error (${r.status})`;
+      try {
+        const errJson = JSON.parse(text);
+        if (errJson.error) errorMsg = errJson.error;
+      } catch(_) {}
+      addMsg('bot','⚠️ ' + errorMsg);
+      btn.textContent='🧠 Analyse Collected Symptoms with AI';
+      return;
+    }
+    const d=await r.json();
+    addMsg('bot',`🎯 **AI Diagnosis Complete!**\n\nPredicted: **${d.disease}**\nConfidence: ${d.confidence}%\nSeverity: ${d.severity}\n\nView your full report: <a href="/result/${d.check_id}/" style="color:#2563eb;font-weight:700">Open Report →</a>`);
+    btn.style.display='none';
+  }catch(e){btn.disabled=false;btn.textContent='🧠 Analyse Collected Symptoms with AI';addMsg('bot','⚠️ Error: '+e.message);}
+}
+
+async function clearConversation() {
+  if (!confirm("Are you sure you want to clear your conversation history? This cannot be undone.")) return;
+  try {
+    const response = await fetch("{% url 'chatbot_clear' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": "{{ csrf_token }}"
+      }
+    });
+    const data = await response.json();
+    if (data.status === "success") {
+      window.location.reload();    }
+  }catch(e){
+    console.error(e);
+    addMsg('bot','⚠️ Unable to clear chat: '+e.message);
+  }
+}
+
+function toggleApiKeyForm() {
+  const form = document.getElementById('apiKeyForm');
+  if (!form) return;
+  form.style.display = form.style.display === 'flex' ? 'none' : 'flex';
+}
+
+async function saveApiKey() {
+  const input = document.getElementById('geminiApiKeyInput');
+  if (!input) return;
+  const key = input.value.trim();
+  const button = document.getElementById('saveApiKeyBtn');
+  if (!key) {
+    addMsg('bot', '⚠️ Please enter a valid Gemini API key.');
+    return;
+  }
+  button.disabled = true;
+  button.textContent = 'Saving…';
+  try {
+    const r = await fetch("{% url 'set_api_key' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ api_key: key })
+    });
+    const d = await r.json();
+    if (r.ok && d.status === 'success') {
+      addMsg('bot', '✅ Gemini API key saved. Reloading chat page to enable live AI.');
+      window.location.reload();
+      return;
+    }
+    throw new Error(d.error || 'Unable to save key');
+  } catch (e) {
+    console.error('API key save failed', e);
+    addMsg('bot', '⚠️ Could not save Gemini API key: ' + e.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Save Key';
+  }
+}
+
+async function clearApiKey() {
+  const button = document.getElementById('clearApiKeyBtn');
+  if (!button) return;
+  button.disabled = true;
+  button.textContent = 'Clearing…';
+  try {
+    const r = await fetch("{% url 'set_api_key' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ api_key: '' })
+    });
+    const d = await r.json();
+    if (r.ok && d.status === 'success') {
+      addMsg('bot', '🗑️ Gemini API key cleared. Reconnecting automatically...');
+      window.location.reload();
+      return;
+    }
+    throw new Error(d.error || 'Unable to clear key');
+  } catch (e) {
+    console.error('API key clear failed', e);
+    addMsg('bot', '⚠️ Could not clear API key: ' + e.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Clear Key';
+  }
+}
+</script>
+{% endblock %}

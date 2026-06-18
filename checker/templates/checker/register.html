@@ -1,0 +1,138 @@
+{% extends 'checker/base.html' %}
+{% block title %}Register — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .auth-wrap{min-height:calc(100vh - 130px);display:flex;align-items:center;justify-content:center;padding:40px 24px}
+  .auth-card{background:#fff;border-radius:20px;border:1px solid var(--border);padding:36px;
+             width:100%;max-width:520px;box-shadow:var(--shadow)}
+  .auth-logo{text-align:center;margin-bottom:24px}
+  .auth-logo svg{width:52px;height:52px;margin:0 auto 10px;display:block}
+  .auth-logo h2{font-size:1.5rem;font-weight:800}
+  .auth-logo p{color:var(--muted);font-size:.88rem;margin-top:3px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .sec-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+             color:var(--muted);margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+  
+  .role-toggle { display: flex; background: var(--border); padding: 4px; border-radius: 12px; margin-bottom: 20px; }
+  .role-btn { flex: 1; text-align: center; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.9rem; transition: all 0.2s; color: var(--muted); }
+  .role-btn.active { background: #fff; color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  
+  .patient-fields { display: block; }
+  .doctor-fields { display: none; }
+  .bmi-live{background:var(--primary-l);border-radius:10px;padding:10px 14px;font-size:.85rem;
+            margin-top:8px;display:none}
+  .auth-footer{text-align:center;margin-top:18px;font-size:.85rem;color:var(--muted)}
+  .auth-footer a{color:var(--primary);font-weight:600;text-decoration:none}
+  @media(max-width:480px){.form-row{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+        <rect width="40" height="40" rx="10" fill="#2563eb"/>
+        <rect x="15" y="7" width="10" height="26" rx="3" fill="white"/>
+        <rect x="7" y="15" width="26" height="10" rx="3" fill="white"/>
+      </svg>
+      <h2>Create MediAI Account</h2>
+      <p>AI-powered personalised healthcare starts here</p>
+    </div>
+    <form method="post" id="regForm">
+      {% csrf_token %}
+      <input type="hidden" name="role" id="userRole" value="patient">
+      
+      <div class="role-toggle">
+          <div class="role-btn active" onclick="setRole('patient', this)">🤒 I am a Patient</div>
+          <div class="role-btn" onclick="setRole('doctor', this)">🩺 I am a Doctor</div>
+      </div>
+      
+      <div class="sec-label">Personal Information</div>
+      <div class="form-row">
+        <div class="form-group"><label>First Name</label><input name="first_name" class="form-control" placeholder="First name"></div>
+        <div class="form-group"><label>Last Name</label><input name="last_name" class="form-control" placeholder="Last name"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Age *</label><input name="age" type="number" class="form-control" placeholder="Years" min="1" max="120" required></div>
+        <div class="form-group"><label>Gender</label>
+          <select name="gender" class="form-control">
+            <option value="">Select</option><option>Male</option><option>Female</option><option>Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="patient-fields">
+        <div class="sec-label">Body Measurements (for BMI & personalised diagnosis)</div>
+        <div class="form-row">
+          <div class="form-group"><label>Height (cm)</label><input name="height" type="number" id="hReg" class="form-control" placeholder="e.g. 170" oninput="liveBMI()"></div>
+          <div class="form-group"><label>Weight (kg)</label><input name="weight" type="number" id="wReg" class="form-control" placeholder="e.g. 70" oninput="liveBMI()"></div>
+        </div>
+        <div class="bmi-live" id="bmiLive"></div>
+      </div>
+      
+      <div class="doctor-fields">
+        <div class="sec-label">Professional Details</div>
+        <div class="form-group"><label>Specialization *</label><input name="specialization" class="form-control" placeholder="e.g. Cardiology"></div>
+        <div class="form-row">
+          <div class="form-group"><label>Experience (Years)</label><input name="experience" type="number" class="form-control" placeholder="e.g. 10"></div>
+          <div class="form-group"><label>Hospital / Clinic</label><input name="hospital" class="form-control" placeholder="e.g. Apollo Hospital"></div>
+        </div>
+      </div>
+
+      <div class="sec-label">Account Credentials</div>
+      <div class="form-group"><label>Username *</label><input name="username" class="form-control" placeholder="Choose a username" required></div>
+      <div class="form-group"><label>Email</label><input name="email" type="email" class="form-control" placeholder="your@email.com"></div>
+      <div class="form-group"><label>Password *</label><input name="password" type="password" class="form-control" placeholder="Choose a strong password" required></div>
+
+      <div class="sec-label">Contact</div>
+      <div class="form-row">
+        <div class="form-group"><label>Phone</label><input name="phone" class="form-control" placeholder="Phone number"></div>
+        <div class="form-group"><label>City</label><input name="location" class="form-control" placeholder="e.g. Bangalore"></div>
+      </div>
+
+      <div style="margin:20px 0;padding:12px;background:rgba(16,185,129,0.1);border-radius:10px;border:1px solid rgba(16,185,129,0.3);font-size:0.8rem;color:var(--text);display:flex;gap:10px;align-items:flex-start">
+        <input type="checkbox" id="hipaa_consent" required style="margin-top:3px;transform:scale(1.2);accent-color:var(--primary)">
+        <label for="hipaa_consent" style="margin:0;line-height:1.4">
+          <strong>Data Privacy & HIPAA Compliance:</strong> I understand that MediAI processes my health data securely using end-to-end encryption. I consent to my data being stored in a HIPAA-compliant manner for the purpose of medical analysis, predictions, and telemedicine consultations.
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;margin-top:6px">
+        Create Account →
+      </button>
+    </form>
+    <div class="auth-footer">Already have an account? <a href="{% url 'login' %}">Sign in</a></div>
+  </div>
+</div>
+<script>
+function liveBMI(){
+  const h=parseFloat(document.getElementById('hReg').value);
+  const w=parseFloat(document.getElementById('wReg').value);
+  const box=document.getElementById('bmiLive');
+  if(h>0&&w>0){
+    const bmi=w/((h/100)**2);
+    let cat='',col='';
+    if(bmi<18.5){cat='Underweight';col='#f59e0b';}
+    else if(bmi<25){cat='Normal';col='#10b981';}
+    else if(bmi<30){cat='Overweight';col='#f59e0b';}
+    else{cat='Obese';col='#ef4444';}
+    box.style.display='block';
+    box.innerHTML=`BMI: <strong style="color:${col}">${bmi.toFixed(1)} — ${cat}</strong> <span style="font-size:.8rem;color:var(--muted)">(used for personalised AI predictions)</span>`;
+  } else box.style.display='none';
+}
+
+function setRole(role, el) {
+    document.getElementById('userRole').value = role;
+    document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    
+    if (role === 'doctor') {
+        document.querySelector('.patient-fields').style.display = 'none';
+        document.querySelector('.doctor-fields').style.display = 'block';
+    } else {
+        document.querySelector('.patient-fields').style.display = 'block';
+        document.querySelector('.doctor-fields').style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

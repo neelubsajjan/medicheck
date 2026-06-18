@@ -1,0 +1,291 @@
+{% extends 'checker/base.html' %}
+{% load checker_tags %}
+{% block title %}Hospital Recommendations — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .hosp-hero{background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:40px 24px 32px;text-align:center}
+  .hosp-hero h1{font-size:2rem;font-weight:800}
+  .hosp-wrap{max-width:1100px;margin:0 auto;padding:28px 24px 80px}
+  .filter-bar{background:#fff;border-radius:16px;border:1px solid var(--border);padding:20px 24px;
+              margin-bottom:24px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .filter-group{display:flex;flex-direction:column;gap:5px;flex:1;min-width:160px}
+  .filter-group label{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+  .hosp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .hosp-card{background:#fff;border-radius:16px;border:1px solid var(--border);padding:22px;
+             transition:all .25s;position:relative;overflow:hidden}
+  .hosp-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(16,185,129,.12)}
+  .hosp-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+                     background:linear-gradient(90deg,var(--accent),#34d399)}
+  .hosp-card.emergency::before{background:linear-gradient(90deg,var(--danger),#f87171)}
+  .hosp-name{font-weight:800;font-size:1rem;margin-bottom:4px}
+  .hosp-city{font-size:.82rem;color:var(--muted);margin-bottom:10px}
+  .hosp-specialties{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+  .spec-tag{background:var(--accent-l);color:var(--accent);padding:3px 9px;border-radius:999px;
+            font-size:.72rem;font-weight:600}
+  .hosp-meta{display:flex;justify-content:space-between;align-items:center;margin-top:10px;
+             font-size:.82rem;color:var(--muted)}
+  .rating{color:#f59e0b;font-weight:700}
+  .hosp-phone{font-size:.8rem;color:var(--primary);font-weight:600;margin-top:8px}
+  .emerg-badge{background:var(--danger-l);color:var(--danger);padding:3px 9px;border-radius:999px;
+               font-size:.72rem;font-weight:700}
+  @media(max-width:900px){.hosp-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:600px){.hosp-grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="hosp-hero">
+  <h1>🏥 Hospital Recommendations</h1>
+  <p style="opacity:.85;margin-top:8px;max-width:520px;margin-left:auto;margin-right:auto">
+    Filter hospitals by your predicted condition and location. AI ranks clinics and hospitals by specialty match and severity.
+  </p>
+</div>
+<div class="hosp-wrap">
+  <!-- Filter bar -->
+  <div class="filter-bar" style="display:flex; flex-direction:column; gap:16px;">
+    <!-- Row 1: Primary Filters -->
+    <div style="display:flex; gap:12px; flex-wrap:wrap; width:100%; align-items:flex-end;">
+      <div class="filter-group">
+        <label>Predicted Disease</label>
+        <select id="fDisease" class="form-control" onchange="filterHospitals()">
+          <option value="">All Conditions</option>
+          {% for h in "Allergic Reaction,Anemia,Anxiety,Appendicitis,Asthma,Bronchitis,Chickenpox,Common Cold,Conjunctivitis,COVID-19,Dengue Fever,Depression,Diabetes,Eczema,Food Poisoning,Gastroenteritis,GERD,Heart Disease,Hepatitis B,Hypertension,Hyperthyroidism,Hypothyroidism,IBS,Influenza,Insomnia,Kidney Stones,Malaria,Measles,Migraine,Panic Disorder,Peptic Ulcer,Pneumonia,Psoriasis,Sciatica,Sinusitis,Tension Headache,Tonsillitis,Tuberculosis,Typhoid,UTI,Vertigo"|split:"," %}
+          <option>{{ h }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Specialty Department</label>
+        <select id="fSpecialty" class="form-control" onchange="filterHospitals()">
+          <option value="">All Specialties</option>
+          <option>Cardiology</option>
+          <option>Neurology</option>
+          <option>Gastroenterology</option>
+          <option>Pulmonology</option>
+          <option>Endocrinology</option>
+          <option>Pediatrics</option>
+          <option>Orthopaedics</option>
+          <option>Dermatology</option>
+          <option>Ophthalmology</option>
+          <option>ENT (Otolaryngology)</option>
+          <option>General Medicine</option>
+          <option>General Surgery</option>
+          <option>Psychiatry</option>
+          <option>Emergency</option>
+        </select>
+      </div>
+      <div class="filter-group" style="min-width: 110px;">
+        <label>Severity Level</label>
+        <select id="fSeverity" class="form-control" onchange="filterHospitals()">
+          <option value="Low">Low</option>
+          <option value="Moderate" selected>Moderate</option>
+          <option value="High">High</option>
+        </select>
+      </div>
+      <div class="filter-group" style="min-width: 110px;">
+        <label>Min Rating</label>
+        <select id="fRating" class="form-control" onchange="filterHospitals()">
+          <option value="0.0">All Ratings</option>
+          <option value="4.0">⭐️ 4.0+</option>
+          <option value="4.5">⭐️ 4.5+</option>
+          <option value="4.7">⭐️ 4.7+</option>
+        </select>
+      </div>
+      <div class="filter-group" style="min-width: 140px; align-items: flex-start; justify-content: flex-end; padding-bottom: 10px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; font-weight:700; color:var(--text); margin:0;">
+          <input type="checkbox" id="fEmergency" onchange="filterHospitals()" style="width:18px; height:18px; cursor:pointer; accent-color:var(--primary);">
+          🚨 24/7 Emergency
+        </label>
+      </div>
+    </div>
+    
+    <!-- Row 2: Location & Search Name -->
+    <div style="display:flex; gap:12px; flex-wrap:wrap; width:100%; align-items:flex-end; border-top: 1px solid var(--border); padding-top:14px;">
+      <div class="filter-group" style="flex:2; min-width:250px;">
+        <label>Search Hospital Name or Location</label>
+        <input id="fSearch" class="form-control" placeholder="🔍 Type hospital name, landmark, or street..." oninput="filterHospitals()">
+      </div>
+      <div class="filter-group" style="flex:1; min-width:180px;">
+        <label>City Location</label>
+        <input id="fCity" class="form-control" placeholder="e.g. Bangalore" value="{{ patient.location|default:'' }}" onkeydown="if(event.key==='Enter')filterHospitals()">
+      </div>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <button class="btn btn-accent" onclick="filterHospitals()" style="padding: 10px 18px; font-weight:700; height:42px;">🔍 Find Hospitals</button>
+        <button class="btn btn-outline" onclick="useLiveLocation()" id="liveLocBtn" style="padding: 10px 14px; font-weight:700; height:42px; display:flex; align-items:center; gap:6px;" title="Use my live location">📍 Use GPS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hospital grid -->
+  <div class="hosp-grid" id="hospGrid">
+    {% for h in hospitals %}
+    <div class="hosp-card{% if h.emergency %} emergency{% endif %}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div class="hosp-name">{{ h.name }}</div>
+        {% if h.emergency %}<span class="emerg-badge">🚨 24/7 Emergency</span>{% endif %}
+      </div>
+      <div class="hosp-city">📍 {{ h.address }}</div>
+      <div class="hosp-specialties">
+        {% for sp in h.specialties %}
+        <span class="spec-tag">{{ sp }}</span>
+        {% endfor %}
+      </div>
+      <div class="hosp-meta">
+        <span class="rating">★ {{ h.rating }}</span>
+        <span>📏 {{ h.distance_km }} km away</span>
+      </div>
+      <div class="hosp-phone">📞 {{ h.phone }}</div>
+      <a href="https://www.google.com/maps/search/?api=1&query={{ h.name|urlencode }}+{{ h.address|urlencode }}" 
+         target="_blank" 
+         class="btn btn-outline btn-sm" 
+         style="margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; width: 100%; justify-content: center; border-color: #22c55e; color: #15803d; font-weight: 600; text-decoration: none; font-size: 0.8rem; border-radius: 8px;">
+         🗺️ View on Google Maps
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div id="hospLoading" style="text-align:center;padding:40px;display:none">
+    <div class="spinner" style="margin:0 auto 12px"></div>
+    <p style="color:var(--muted)">Finding best hospitals…</p>
+  </div>
+</div>
+
+<script>
+let currentLat = null;
+let currentLng = null;
+
+function useLiveLocation() {
+  const btn = document.getElementById('liveLocBtn');
+  const cityInput = document.getElementById('fCity');
+
+  // Remove any old status banner
+  const old = document.getElementById('locStatusBanner');
+  if (old) old.remove();
+
+  function showBanner(msg, color) {
+    const banner = document.createElement('div');
+    banner.id = 'locStatusBanner';
+    banner.style.cssText = `background:${color};color:#fff;padding:8px 14px;border-radius:8px;font-size:0.82rem;margin-top:8px;text-align:center;`;
+    banner.innerHTML = msg;
+    cityInput.parentElement.parentElement.appendChild(banner);
+    setTimeout(() => banner.remove(), 8000);
+  }
+
+  if (!navigator.geolocation) {
+    btn.textContent = "📍 IP/Default";
+    cityInput.value = "Live Location";
+    currentLat = null;
+    currentLng = null;
+    showBanner("⚠️ GPS not supported. Using Bangalore as default location.", "#f59e0b");
+    filterHospitals();
+    return;
+  }
+
+  btn.textContent = "📍 Locating…";
+  btn.style.opacity = "0.7";
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      currentLat = position.coords.latitude;
+      currentLng = position.coords.longitude;
+      btn.textContent = "📍 GPS ✓";
+      btn.style.borderColor = "#22c55e";
+      btn.style.color = "#15803d";
+      btn.style.opacity = "1";
+      btn.title = `GPS: ${currentLat.toFixed(4)}, ${currentLng.toFixed(4)}`;
+      cityInput.value = "Live Location";
+      showBanner(`✅ GPS location obtained: ${currentLat.toFixed(4)}°N, ${currentLng.toFixed(4)}°E — showing hospitals within 50 km`, "#22c55e");
+      filterHospitals();
+    },
+    (err) => {
+      // GPS blocked (common on HTTP) — server will use IP geolocation or Bangalore default
+      btn.textContent = "📍 IP/Default";
+      btn.style.borderColor = "#f59e0b";
+      btn.style.color = "#b45309";
+      btn.style.opacity = "1";
+      btn.title = "GPS blocked (HTTP). Server using IP or Bangalore default.";
+      cityInput.value = "Live Location";
+      currentLat = null;
+      currentLng = null;
+      const reason = err.code === 1 ? "Permission denied" : err.code === 2 ? "Position unavailable" : "Timeout";
+      showBanner(`⚠️ GPS ${reason} (browsers block GPS on HTTP). Server will use IP geolocation or Bangalore as default. Results sorted by proximity.`, "#f59e0b");
+      filterHospitals();
+    },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+  );
+}
+
+
+async function filterHospitals(){
+  const disease=document.getElementById('fDisease').value;
+  const specialty=document.getElementById('fSpecialty').value;
+  const severity=document.getElementById('fSeverity').value;
+  const min_rating=document.getElementById('fRating').value;
+  const emergency_only=document.getElementById('fEmergency').checked;
+  const search_query=document.getElementById('fSearch').value;
+  const city=document.getElementById('fCity').value;
+  
+  document.getElementById('hospGrid').style.display='none';
+  document.getElementById('hospLoading').style.display='block';
+  
+  const payload = {
+    disease: disease,
+    specialty: specialty,
+    severity: severity,
+    min_rating: min_rating,
+    emergency_only: emergency_only,
+    search_query: search_query,
+    city: city
+  };
+  
+  if (city === "Live Location" && currentLat && currentLng) {
+      payload.lat = currentLat;
+      payload.lng = currentLng;
+  }
+
+  try{
+    const r=await fetch("{% url 'hospital_suggest' %}",{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const d=await r.json();
+    document.getElementById('hospLoading').style.display='none';
+    document.getElementById('hospGrid').style.display='grid';
+    if(d.error){alert(d.error);return;}
+    const grid=document.getElementById('hospGrid');
+    if (!d.hospitals || d.hospitals.length === 0) {
+      grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--muted);">
+        <h4>🔍 No clinics/hospitals matched your specific filters.</h4>
+        <p style="font-size:0.9rem; margin-top:6px;">Try broadening your keywords or clearing some filters.</p>
+      </div>`;
+      return;
+    }
+    grid.innerHTML=d.hospitals.map(h=>`
+      <div class="hosp-card${h.emergency?' emergency':''}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div class="hosp-name">${h.name}</div>
+          ${h.emergency?'<span class="emerg-badge">🚨 24/7 Emergency</span>':''}
+        </div>
+        <div class="hosp-city">📍 ${h.address}</div>
+        <div class="hosp-specialties">${h.specialties.map(s=>`<span class="spec-tag">${s}</span>`).join('')}</div>
+        <div class="hosp-meta">
+          <span class="rating">★ ${h.rating}</span>
+          <span>📏 ${h.distance_km} km away</span>
+        </div>
+        <div class="hosp-phone">📞 ${h.phone}</div>
+        ${d.specialties && d.specialties.length > 0?'<div style="margin-top:8px;font-size:.75rem;color:var(--accent);margin-bottom:4px">✓ Matches: '+d.specialties.join(', ')+'</div>':''}
+        <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(h.name + ' ' + h.address)}" 
+           target="_blank" 
+           class="btn btn-outline btn-sm" 
+           style="margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; width: 100%; justify-content: center; border-color: #22c55e; color: #15803d; font-weight: 600; text-decoration: none; font-size: 0.8rem; border-radius: 8px;">
+           🗺️ View on Google Maps
+        </a>
+      </div>`).join('');
+  }catch(e){
+    document.getElementById('hospLoading').style.display='none';
+    document.getElementById('hospGrid').style.display='grid';
+    alert('Error: '+e.message);
+  }
+}
+</script>
+{% endblock %}

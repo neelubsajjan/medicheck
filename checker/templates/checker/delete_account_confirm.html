@@ -1,0 +1,48 @@
+{% extends 'checker/base.html' %}
+{% block title %}Delete Account — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .danger-wrap{min-height:calc(100vh - 130px);display:flex;align-items:center;justify-content:center;padding:40px 24px}
+  .danger-card{background:#fff;border-radius:20px;border:2px solid var(--danger);padding:40px;
+             width:100%;max-width:480px;box-shadow:var(--shadow)}
+  .danger-logo{text-align:center;margin-bottom:28px}
+  .danger-logo h2{font-size:1.5rem;font-weight:800;color:var(--danger)}
+  .danger-logo p{color:var(--muted);font-size:.88rem;margin-top:6px}
+  .confirm-box{background:var(--danger-l);border-radius:10px;padding:16px;margin-bottom:24px;border:1px solid #fee2e2}
+  .confirm-box ul{margin-left:20px;margin-top:8px;font-size:.82rem;color:#991b1b;line-height:1.6}
+  .btn-row{display:flex;gap:12px;margin-top:20px}
+</style>
+{% endblock %}
+{% block content %}
+<div class="danger-wrap">
+  <div class="danger-card">
+    <div class="danger-logo">
+      <div style="font-size:3rem;margin-bottom:12px">⚠️</div>
+      <h2>Permanently Delete Account?</h2>
+      <p>Are you sure you want to delete your MediAI account? This action is final.</p>
+    </div>
+    
+    <div class="confirm-box">
+      <strong style="font-size:.9rem;color:#991b1b">The following data will be permanently deleted:</strong>
+      <ul>
+        <li>Your user profile and credentials</li>
+        <li>All AI Chat conversations and history</li>
+        <li>Saved symptom checker diagnosis history</li>
+        <li>Vitals logs and registered medications</li>
+        <li>Scheduled consultation appointments</li>
+      </ul>
+    </div>
+    
+    <form method="post">
+      {% csrf_token %}
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:16px;text-align:center">
+        To confirm, please click "Permanently Delete".
+      </p>
+      <div class="btn-row">
+        <a href="{% url 'edit_profile' %}" class="btn btn-outline" style="flex:1;justify-content:center">Cancel</a>
+        <button type="submit" class="btn btn-danger" style="flex:1;justify-content:center;background:var(--danger);color:#fff">Permanently Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends 'checker/base.html' %}
+{% block title %}MediAI — AI Multimodal Healthcare System{% endblock %}
+{% block extra_css %}
+<style>
+  .hero{background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 50%,#7c3aed 100%);
+        color:#fff;padding:90px 24px 70px;text-align:center;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;inset:0;
+    background:radial-gradient(circle at 20% 40%,rgba(255,255,255,.06) 0%,transparent 60%),
+               radial-gradient(circle at 80% 60%,rgba(255,255,255,.04) 0%,transparent 60%)}
+  .hero-badge{display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
+              padding:5px 16px;border-radius:999px;font-size:.78rem;font-weight:700;
+              letter-spacing:.08em;text-transform:uppercase;margin-bottom:22px}
+  .hero h1{font-size:clamp(2rem,5vw,3.4rem);font-weight:800;line-height:1.1;
+           max-width:720px;margin:0 auto 18px}
+  .hero p{font-size:1.05rem;opacity:.85;max-width:540px;margin:0 auto 36px}
+  .hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
+  .btn-hero-white{background:#fff;color:var(--primary)!important;font-weight:800;border-radius:12px;
+                  padding:14px 28px;font-size:1rem;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:all .2s}
+  .btn-hero-white:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
+  .btn-hero-ghost{background:rgba(255,255,255,.12);color:#fff!important;font-weight:600;border-radius:12px;
+                  padding:14px 28px;font-size:1rem;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+                  border:2px solid rgba(255,255,255,.3);transition:all .2s}
+  .btn-hero-ghost:hover{background:rgba(255,255,255,.22)}
+
+  .stats-bar{background:#fff;border-radius:20px;max-width:960px;margin:-44px auto 0;
+             position:relative;z-index:2;display:grid;grid-template-columns:repeat(5,1fr);
+             box-shadow:0 8px 40px rgba(37,99,235,.15);overflow:hidden;border:1px solid var(--border)}
+  .stat-item{padding:22px 16px;text-align:center}
+  .stat-item+.stat-item{border-left:1px solid var(--border)}
+  .stat-num{font-size:1.8rem;font-weight:800;color:var(--primary);font-family:'Plus Jakarta Sans',sans-serif}
+  .stat-lbl{font-size:.72rem;color:var(--muted);font-weight:500;margin-top:2px}
+
+  .section{padding:72px 24px}
+  .sec-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;
+             color:var(--primary);margin-bottom:10px}
+  .sec-title{font-size:1.9rem;font-weight:800;line-height:1.2;margin-bottom:10px}
+  .sec-sub{color:var(--muted);max-width:500px;font-size:.95rem}
+
+  .feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:36px}
+  .feat{background:#fff;border-radius:16px;padding:26px;border:1px solid var(--border);
+        position:relative;overflow:hidden;transition:all .3s}
+  .feat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+  .feat.blue::before{background:linear-gradient(90deg,#2563eb,#60a5fa)}
+  .feat.green::before{background:linear-gradient(90deg,#10b981,#34d399)}
+  .feat.purple::before{background:linear-gradient(90deg,#7c3aed,#a78bfa)}
+  .feat.orange::before{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+  .feat.red::before{background:linear-gradient(90deg,#ef4444,#f87171)}
+  .feat.teal::before{background:linear-gradient(90deg,#0891b2,#22d3ee)}
+  .feat:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.08)}
+  .feat-icon{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;
+             justify-content:center;font-size:1.4rem;margin-bottom:16px}
+  .feat h3{font-size:1rem;font-weight:700;margin-bottom:6px}
+  .feat p{font-size:.84rem;color:var(--muted);line-height:1.65}
+
+  .input-modes{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:36px}
+  .mode-card{background:#fff;border-radius:16px;padding:24px;border:1px solid var(--border);
+             text-align:center;transition:all .25s;cursor:pointer;text-decoration:none;display:block}
+  .mode-card:hover{transform:translateY(-4px);box-shadow:0 10px 28px rgba(124,58,237,.12);
+                   border-color:var(--purple)}
+  .mode-icon-big{font-size:2.4rem;display:block;margin-bottom:12px}
+  .mode-card h3{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:5px}
+  .mode-card p{font-size:.78rem;color:var(--muted)}
+
+  .cta-section{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;text-align:center;padding:72px 24px}
+  .cta-section h2{font-size:2rem;font-weight:800;max-width:600px;margin:0 auto 14px}
+  .cta-section p{opacity:.75;max-width:440px;margin:0 auto 28px}
+
+  @media(max-width:900px){.feature-grid{grid-template-columns:1fr 1fr}.stats-bar{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:600px){.feature-grid,.input-modes{grid-template-columns:1fr}.stats-bar{grid-template-columns:1fr 1fr}}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <div style="position:relative;z-index:1">
+    <div class="hero-badge">🧬 AI Multimodal Healthcare System</div>
+    <h1>Intelligent Symptom Analysis & Telemedicine Support</h1>
+    <p>Voice · Image · Manual — AI analyses all your inputs together for personalised, accurate health insights.</p>
+    <div class="hero-btns">
+      <a href="{% url 'symptom_checker' %}" class="btn-hero-white">⚡ Check Symptoms Now</a>
+      <a href="{% url 'multimodal' %}" class="btn-hero-ghost">🧬 Try Multimodal Input</a>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="stats-bar">
+    <div class="stat-item"><div class="stat-num">41</div><div class="stat-lbl">Diseases</div></div>
+    <div class="stat-item"><div class="stat-num">130+</div><div class="stat-lbl">Symptoms</div></div>
+    <div class="stat-item"><div class="stat-num">6</div><div class="stat-lbl">ML Models</div></div>
+    <div class="stat-item"><div class="stat-num">3</div><div class="stat-lbl">Input Modes</div></div>
+    <div class="stat-item"><div class="stat-num">AI</div><div class="stat-lbl">Chat Assistant</div></div>
+  </div>
+  {% if not model_ready %}
+  <div style="background:var(--danger-l);border:1px solid #fca5a5;border-radius:12px;padding:14px 18px;color:#991b1b;margin-top:28px">
+    ⚠️ <strong>ML models not found.</strong> Run <code>python train_models.py</code> then restart the server.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Features -->
+<div class="section">
+  <div class="container">
+    <div class="sec-label">Platform Features</div>
+    <div class="sec-title">Everything you need for AI-powered healthcare</div>
+    <div class="feature-grid">
+      <div class="feat blue"><div class="feat-icon" style="background:#eff6ff">🤖</div><h3>6 ML Models</h3><p>Logistic Regression, Random Forest, SVM, KNN, Naive Bayes — pick any model for your analysis.</p></div>
+      <div class="feat green"><div class="feat-icon" style="background:#ecfdf5">🎯</div><h3>Personalised Diagnosis</h3><p>BMI, age, and gender are factored into every prediction for accurate, patient-specific results.</p></div>
+      <div class="feat purple"><div class="feat-icon" style="background:#f5f3ff">🧬</div><h3>Multimodal Input</h3><p>Analyse symptoms from voice speech, uploaded images, or manual text — all combined.</p></div>
+      <div class="feat orange"><div class="feat-icon" style="background:#fffbeb">💬</div><h3>AI Chatbot</h3><p>Real-time conversational assistant that collects symptoms, answers questions, and explains your results.</p></div>
+      <div class="feat red"><div class="feat-icon" style="background:#fef2f2">🏥</div><h3>Hospital Finder</h3><p>Recommends nearby hospitals ranked by specialty match, severity, and emergency availability.</p></div>
+      <div class="feat teal"><div class="feat-icon" style="background:#ecfeff">📊</div><h3>Full Report</h3><p>Every check generates confidence score, severity level, precautions, and home care advice.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- Input modes -->
+<div style="background:var(--primary-l);padding:60px 24px">
+  <div class="container">
+    <div class="sec-label">Input Modes</div>
+    <div class="sec-title">Three ways to describe your symptoms</div>
+    <div class="input-modes">
+      <a href="{% url 'multimodal' %}" class="mode-card">
+        <span class="mode-icon-big">⌨️</span>
+        <h3>Manual</h3>
+        <p>Select symptoms from a searchable list of 130+ options</p>
+      </a>
+      <a href="{% url 'multimodal' %}" class="mode-card">
+        <span class="mode-icon-big">🎤</span>
+        <h3>Voice</h3>
+        <p>Speak naturally — AI extracts symptoms from your speech</p>
+      </a>
+      <a href="{% url 'multimodal' %}" class="mode-card">
+        <span class="mode-icon-big">📸</span>
+        <h3>Image</h3>
+        <p>Upload a photo — AI detects visible symptoms like rashes or redness</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="cta-section">
+  <h2>Start your AI health assessment now</h2>
+  <p>No appointment needed. Personalised results in seconds.</p>
+  <a href="{% url 'register' %}" class="btn-hero-white">Create Free Account →</a>
+</div>
+{% endblock %}

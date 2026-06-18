@@ -1,0 +1,79 @@
+{% extends 'checker/base.html' %}
+{% block title %}Video Consultation — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .video-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    display: flex;
+    flex-direction: column;
+    height: 85vh;
+  }
+  .video-header {
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .video-header h1 {
+    font-size: 1.6rem;
+    font-weight: 800;
+  }
+  .video-header p {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 4px;
+  }
+  .video-container {
+    flex-grow: 1;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  }
+  .video-container iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+  .hipaa-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="video-wrap">
+  <div class="video-header">
+    <div>
+      <h1>🎥 Telemedicine Consultation</h1>
+      <p>
+        {% if is_doctor %}
+          Consulting with Patient: <strong>{{ consultation.patient.get_full_name|default:consultation.patient.username }}</strong>
+        {% else %}
+          Consulting with <strong>Dr. {{ consultation.doctor.user.get_full_name|default:consultation.doctor.user.username }}</strong>
+        {% endif %}
+      </p>
+    </div>
+    <div style="text-align:right">
+      <div class="hipaa-badge">🔒 End-to-End Encrypted (HIPAA Compliant)</div>
+      <div style="margin-top:8px">
+        <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">Leave Call</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="video-container">
+    <iframe src="{{ consultation.meet_link }}" allow="camera; microphone; fullscreen; display-capture; autoplay"></iframe>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,148 @@
+{% extends 'checker/base.html' %}
+{% load checker_tags %}
+{% block title %}Edit Profile — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .profile-wrap{max-width:700px;margin:40px auto;padding:0 24px 80px}
+  .profile-hero{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border-radius:20px;padding:36px;margin-bottom:28px;display:flex;align-items:center;gap:20px}
+  .avatar{width:72px;height:72px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0}
+  .bmi-display{background:var(--primary-l);border-radius:14px;padding:20px;margin-bottom:20px;display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+  .bmi-val{font-size:2.4rem;font-weight:800;color:var(--primary);font-family:'Playfair Display',serif}
+  .bmi-info{flex:1}
+  .bmi-cat{font-size:1rem;font-weight:700;margin-bottom:4px}
+  .bmi-bar{height:10px;background:var(--border);border-radius:999px;overflow:hidden;margin-top:8px;max-width:300px}
+  .bmi-fill{height:100%;border-radius:999px;background:var(--accent)}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .bmi-preview{background:var(--primary-l);border-radius:10px;padding:14px 16px;margin-top:12px;font-size:.9rem;display:none}
+  .section-head{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  @media(max-width:600px){.form-row{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="profile-wrap">
+  <div class="profile-hero">
+    <div class="avatar">👤</div>
+    <div>
+      <h2 style="font-size:1.5rem;font-weight:800">{{ user.get_full_name|default:user.username }}</h2>
+      <div style="opacity:.8;font-size:.9rem;margin-top:4px">@{{ user.username }} · {{ user.email }}</div>
+      {% if profile.bmi %}
+      <div style="margin-top:8px;background:rgba(255,255,255,.15);border-radius:8px;padding:5px 12px;display:inline-block;font-size:.85rem;font-weight:600">
+        BMI: {{ profile.bmi }} — {{ profile.bmi_category }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if profile.bmi %}
+  <div class="bmi-display">
+    <div>
+      <div style="font-size:.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.08em">Your BMI</div>
+      <div class="bmi-val">{{ profile.bmi }}</div>
+    </div>
+    <div class="bmi-info">
+      <div class="bmi-cat" style="color:{% if profile.bmi_category == 'Normal' %}var(--accent){% elif profile.bmi_category == 'Underweight' %}var(--warn){% else %}var(--danger){% endif %}">{{ profile.bmi_category }}</div>
+      <div style="font-size:.82rem;color:var(--muted)">
+        {% if profile.bmi_category == 'Normal' %}Your BMI is in the healthy range (18.5–24.9). Keep it up!
+        {% elif profile.bmi_category == 'Underweight' %}BMI below 18.5. Consider consulting a nutritionist.
+        {% elif profile.bmi_category == 'Overweight' %}BMI 25–29.9. Moderate diet and exercise recommended.
+        {% else %}BMI ≥ 30. Please consult your doctor about a weight management plan.{% endif %}
+      </div>
+      <div class="bmi-bar"><div class="bmi-fill" style="width:{% if profile.bmi < 18.5 %}30%{% elif profile.bmi < 25 %}55%{% elif profile.bmi < 30 %}75%{% else %}100%{% endif %}"></div></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <form method="post">
+      {% csrf_token %}
+      <div class="section-head">Personal Information</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>First Name</label>
+          <input name="first_name" class="form-control" value="{{ user.first_name }}" placeholder="First name">
+        </div>
+        <div class="form-group">
+          <label>Last Name</label>
+          <input name="last_name" class="form-control" value="{{ user.last_name }}" placeholder="Last name">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Age</label>
+          <input name="age" type="number" class="form-control" value="{{ profile.age|default:'' }}" min="1" max="120" placeholder="Years">
+        </div>
+        <div class="form-group">
+          <label>Gender</label>
+          <select name="gender" class="form-control">
+            <option value="">Select</option>
+            {% for g in 'Male,Female,Other'|split:',' %}
+            <option value="{{ g }}" {% if profile.gender == g %}selected{% endif %}>{{ g }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="section-head">Body Measurements (for BMI)</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Height (cm)</label>
+          <input name="height" type="number" class="form-control" id="heightInput"
+                 value="{{ profile.height_cm|default:'' }}" min="50" max="280" placeholder="e.g. 170" oninput="calcBMI()">
+        </div>
+        <div class="form-group">
+          <label>Weight (kg)</label>
+          <input name="weight" type="number" class="form-control" id="weightInput"
+                 value="{{ profile.weight_kg|default:'' }}" min="10" max="400" placeholder="e.g. 70" oninput="calcBMI()">
+        </div>
+      </div>
+      <div class="bmi-preview" id="bmiPreview"></div>
+
+      <div class="section-head">Contact & Location</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Phone</label>
+          <input name="phone" class="form-control" value="{{ profile.phone|default:'' }}" placeholder="Phone number">
+        </div>
+        <div class="form-group">
+          <label>City / Location</label>
+          <input name="location" class="form-control" value="{{ profile.location|default:'' }}" placeholder="e.g. Bangalore">
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;margin-top:8px">
+        💾 Save Profile
+      </button>
+    </form>
+  </div>
+
+  <div class="card" style="margin-top:28px;border-color:var(--danger);background:var(--danger-l)">
+    <h3 style="color:var(--danger);font-size:1.1rem;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      ⚠️ Danger Zone
+    </h3>
+    <p style="font-size:.85rem;color:#991b1b;margin-bottom:16px;line-height:1.5">
+      Once you delete your account, there is no going back. All your diagnosis history, chat conversations, vitals logs, and consultations will be permanently erased.
+    </p>
+    <a href="{% url 'delete_account' %}" class="btn btn-danger" style="display:inline-flex;width:auto">Delete Account</a>
+  </div>
+</div>
+
+<script>
+function calcBMI(){
+  const h=parseFloat(document.getElementById('heightInput').value);
+  const w=parseFloat(document.getElementById('weightInput').value);
+  const box=document.getElementById('bmiPreview');
+  if(h>0&&w>0){
+    const bmi=w/((h/100)**2);
+    let cat='',col='';
+    if(bmi<18.5){cat='Underweight';col='#f59e0b';}
+    else if(bmi<25){cat='Normal';col='#10b981';}
+    else if(bmi<30){cat='Overweight';col='#f59e0b';}
+    else{cat='Obese';col='#ef4444';}
+    box.style.display='block';
+    box.innerHTML=`<strong>Calculated BMI: <span style="color:${col}">${bmi.toFixed(1)} — ${cat}</span></strong><br>
+    <span style="font-size:.82rem;color:var(--muted)">This will be saved when you submit the form.</span>`;
+  } else { box.style.display='none'; }
+}
+calcBMI();
+</script>
+{% endblock %}

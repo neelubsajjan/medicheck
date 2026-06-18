@@ -1,0 +1,45 @@
+{% extends 'checker/base.html' %}
+{% block title %}Login — MediAI{% endblock %}
+{% block extra_css %}
+<style>
+  .auth-wrap{min-height:calc(100vh - 130px);display:flex;align-items:center;justify-content:center;padding:40px 24px}
+  .auth-card{background:#fff;border-radius:20px;border:1px solid var(--border);padding:40px;
+             width:100%;max-width:420px;box-shadow:var(--shadow)}
+  .auth-logo{text-align:center;margin-bottom:28px}
+  .auth-logo svg{width:52px;height:52px;margin:0 auto 10px;display:block}
+  .auth-logo h2{font-size:1.5rem;font-weight:800}
+  .auth-logo p{color:var(--muted);font-size:.88rem;margin-top:3px}
+  .auth-footer{text-align:center;margin-top:18px;font-size:.85rem;color:var(--muted)}
+  .auth-footer a{color:var(--primary);font-weight:600;text-decoration:none}
+</style>
+{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+        <rect width="40" height="40" rx="10" fill="#2563eb"/>
+        <rect x="15" y="7" width="10" height="26" rx="3" fill="white"/>
+        <rect x="7" y="15" width="26" height="10" rx="3" fill="white"/>
+      </svg>
+      <h2>Welcome Back</h2>
+      <p>Sign in to your MediAI account</p>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-group"><label>Username</label>
+        <input name="username" class="form-control" placeholder="Your username" required autofocus></div>
+      <div class="form-group">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <label style="margin-bottom:0">Password</label>
+          <a href="{% url 'password_reset' %}" style="font-size:.78rem;color:var(--primary);text-decoration:none;font-weight:600">Forgot?</a>
+        </div>
+        <input name="password" type="password" class="form-control" placeholder="Your password" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:13px">Sign In →</button>
+
+    </form>
+    <div class="auth-footer">Don't have an account? <a href="{% url 'register' %}">Create one free</a></div>
+  </div>
+</div>
+{% endblock %}
