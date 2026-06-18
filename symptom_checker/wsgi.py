@@ -2,18 +2,26 @@ import os
 import logging
 from django.core.wsgi import get_wsgi_application
 
-# Logging Configuration
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Set Default Settings Module
-os.environ.setdefault(
-    'DJANGO_SETTINGS_MODULE',
-    'symptom_checker.settings'
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
-# Initialize WSGI Application
+logger = logging.getLogger("symptom_checker")
+
+# Environment Configuration
+os.environ.setdefault(
+    "DJANGO_SETTINGS_MODULE",
+    "symptom_checker.settings"
+)
+
+# WSGI Application
 application = get_wsgi_application()
 
-# Startup Log
-logger.info("AI Disease Recognizer v2.0 started successfully")
+# Startup Information
+logger.info("===================================")
+logger.info(" AI Disease Recognizer v2.1")
+logger.info(" WSGI Server Started Successfully")
+logger.info(f" Environment : {os.getenv('DJANGO_SETTINGS_MODULE')}")
+logger.info("===================================")
