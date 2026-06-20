@@ -3,7 +3,7 @@
 + from dotenv import load_dotenv
 
 + BASE_DIR = Path(_file_).resolve().parent.parent
-
++ # Load enviroonment variables from .env file
 + SECRET_KEY = 'django-insecure-mediAI-v2-key-xyz123'
 + DEBUG = True
 + ALLOWED_HOSTS = ['*']
